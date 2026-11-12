@@ -17,5 +17,4 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    # commit is set by Render on deploy; the deploy workflow waits until it matches.
-    return {"status": "ok", "version": __version__, "commit": os.environ.get("RENDER_GIT_COMMIT")}
+    return {"status": "ok", "version": __version__}

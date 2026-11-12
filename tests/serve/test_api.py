@@ -1,14 +1,12 @@
 from fastapi.testclient import TestClient
 
+from solar_race_planner import __version__
 from solar_race_planner.serve.app import app
 
 client = TestClient(app)
 
 
 def test_health():
-    assert client.get("/health").json()["status"] == "ok"
-
-
-def test_health_reports_deployed_commit(monkeypatch):
-    monkeypatch.setenv("RENDER_GIT_COMMIT", "abc123")
-    assert client.get("/health").json()["commit"] == "abc123"
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": __version__}
