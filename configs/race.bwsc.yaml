@@ -1,0 +1,19 @@
+# BWSC race rules used by the race-rule engine
+name: bwsc-2025-route
+start: Darwin
+finish: Adelaide
+finish_km: 3026.9
+driving_window: ["08:00", "17:00"]
+control_stop_minutes: 30
+control_stops:   # km from Darwin
+  - {name: Katherine, km: 322}
+  - {name: Dunmarra, km: 631}
+  - {name: Tennant Creek, km: 988}
+  - {name: Barrow Creek, km: 1212}
+  - {name: Alice Springs, km: 1496}
+  - {name: Erldunda, km: 1694}
+  - {name: Coober Pedy, km: 2181}
+  - {name: Glendambo, km: 2434}
+  - {name: Port Augusta, km: 2720.5}
+# Battery packs are sealed overnight (19:15–06:15)
+static_charging_windows: [["06:15", "08:00"], ["17:00", "19:15"]]

@@ -1,0 +1,33 @@
+# docker compose up
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: srp
+      POSTGRES_PASSWORD: srp
+      POSTGRES_DB: srp
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  api:
+    build: .
+    env_file: [.env]
+    environment:
+      SRP_DATABASE_URL: postgresql://srp:srp@db:5432/srp
+      SRP_DATA_DIR: /data
+    volumes: [./data:/data]
+    ports: ["8000:8000"]
+    depends_on: [db]
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host"
+    environment:
+      API_URL: http://api:8000
+    volumes: [./frontend:/app]
+    ports: ["5173:5173"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
