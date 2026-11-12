@@ -1,0 +1,16 @@
+# Reference car profile. PLACEHOLDER values
+name: reference-car
+mass_kg: 280            # with driver
+cda_m2: 0.20
+crr: 0.010
+array:
+  area_m2: 4.0
+  efficiency: 0.23
+  temp_coeff_per_c: -0.0029
+battery:
+  capacity_wh: 3000     # Challenger storage limit is 3 kWh
+  min_soc: 0.10
+  charge_eff: 0.97
+  discharge_eff: 0.97
+drivetrain_eff: 0.94
+max_speed_kmh: 110

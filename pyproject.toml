@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solar-race-planner"
+version = "0.1.0"
+description = "Race strategy for solar cars from open satellite and weather data."
+readme = "README.md"
+requires-python = ">=3.12"
+# Runtime pins live in requirements.txt; keep these ranges loose.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "pyyaml>=6.0",
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "pyarrow>=18",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+# Satellite and geospatial stack (DAT-*, BE-10). Heavy; install when you work on these.
+geo = [
+    "pystac-client>=0.8",
+    "odc-stac>=0.3",
+    "rioxarray>=0.17",
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyproj>=3.7",
+    "osmnx>=2.0",
+]
+# Google Earth Engine (DAT-05, DAT-12): cloud-side composites and sampling.
+gee = [
+    "earthengine-api>=1.4",
+]
+# Solar physics and ML (MOD-*, AI-*).
+model = [
+    "pvlib>=0.11",
+    "lightgbm>=4.5",
+    "scikit-learn>=1.5",
+]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
