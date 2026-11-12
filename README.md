@@ -51,7 +51,7 @@ docker compose up --build
 | [docs/architecture.md](docs/architecture.md) | Structure, stack, data flow |
 | [docs/data-contracts.md](docs/data-contracts.md) | File formats between layers |
 | [docs/testing.md](docs/testing.md) | How each part is tested on its own |
-| [docs/deployment.md](docs/deployment.md) | TBD |
+| [docs/deployment.md](docs/deployment.md) | Hosting on Northflank |
 | [docs/bwsc-facts.md](docs/bwsc-facts.md) | The competition |
 
 ## Data and licences

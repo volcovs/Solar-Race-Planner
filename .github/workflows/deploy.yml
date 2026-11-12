@@ -1,0 +1,58 @@
+# Deploys to Northflank after the tests pass on main (setup: docs/deployment.md).
+# Northflank's own CI (build on push) is off, so only commits that passed get built;
+# its CD is on, so each finished build is deployed.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    # Skipped until Northflank is set up, so merges before that don't fail.
+    if: vars.NORTHFLANK_PROJECT_ID != ''
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web]
+    env:
+      NF_API: https://api.northflank.com/v1/projects/${{ vars.NORTHFLANK_PROJECT_ID }}/services/${{ matrix.service }}/build
+      NF_TOKEN: ${{ secrets.NORTHFLANK_API_TOKEN }}
+    steps:
+      - name: Build ${{ matrix.service }} at this commit
+        run: |
+          build_id=$(curl -sSf -X POST "$NF_API" \
+            -H "Authorization: Bearer $NF_TOKEN" -H "Content-Type: application/json" \
+            -d '{"sha": "${{ github.sha }}"}' | jq -r .data.id)
+          echo "Build $build_id started"
+          for _ in $(seq 60); do
+            sleep 20
+            build=$(curl -sSf "$NF_API/$build_id" -H "Authorization: Bearer $NF_TOKEN")
+            echo "$(jq -r .data.status <<<"$build")"
+            if [ "$(jq -r .data.concluded <<<"$build")" = true ]; then
+              jq -r .data.message <<<"$build"
+              [ "$(jq -r .data.success <<<"$build")" = true ] && exit 0 || exit 1
+            fi
+          done
+          echo "Build did not finish in 20 minutes"; exit 1
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: API answers /health
+        run: |
+          for _ in $(seq 20); do
+            curl -sf "${{ vars.API_URL }}/health" | jq -e '.status == "ok"' && exit 0
+            sleep 15
+          done
+          echo "API health check failed"; exit 1
