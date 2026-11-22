@@ -20,7 +20,7 @@ describe("buildRoute", () => {
 
   it("uses the file's length, so km match the data pipeline", () => {
     expect(route.lengthKm).toBeCloseTo(333.6, 9);
-    expect(route.cum.at(-1)).toBeCloseTo(333.6, 9);
+    expect(route.segments.at(-1)!.kmEnd).toBeCloseTo(333.6, 9);
   });
 
   it("rejects a file without a route line", () => {

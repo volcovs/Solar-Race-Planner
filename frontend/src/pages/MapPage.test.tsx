@@ -42,6 +42,21 @@ describe("MapPage", () => {
   });
 
 
+  it("has a button that shows the whole route", async () => {
+    const { map } = await openMap();
+    const button = map.controls[0].onAdd(map).querySelector("button")!; // the fake zoom control isn't recorded
+
+    expect(button).toHaveAccessibleName("Show the whole route");
+    fireEvent.click(button);
+    expect(map.fitBounds).toHaveBeenCalledWith(
+      [
+        [0, 0],
+        [3, 0],
+      ],
+      expect.anything(),
+    );
+  });
+
   it("shows details of a clicked stretch and closes them", async () => {
     const { map } = await openMap();
     map.queryRenderedFeatures.mockReturnValue([{ id: 0 }]);

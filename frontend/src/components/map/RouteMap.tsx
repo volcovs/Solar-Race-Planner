@@ -1,8 +1,8 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl } from "maplibre-gl";
+import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type IControl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { bounds } from "../../lib/geo";
 import { placeName, type RouteData } from "../../lib/route";
 import { currentTheme, readToken, useTheme, type Theme } from "../../lib/theme";
@@ -24,10 +24,6 @@ const STOPS = "stops";
 const ROUTE_LINE = "route-line";
 const TAP_TOLERANCE_PX = 10; // the route line is thin; accept taps near it
 
-export interface RouteMapHandle {
-  fitRoute: () => void;
-}
-
 interface Props {
   route: RouteData;
   selectedId: number | null;
@@ -35,17 +31,13 @@ interface Props {
 }
 
 /** MapLibre map of the route and its stops; a stretch of road can be hovered and selected. */
-export const RouteMap = forwardRef<RouteMapHandle, Props>(function RouteMap({ route, selectedId, onSelect }, ref) {
+export function RouteMap({ route, selectedId, onSelect }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const theme = useTheme();
   // The style.load handler re-adds layers after every style change and needs the latest props.
   const latest = useRef({ route, selectedId, onSelect });
   latest.current = { route, selectedId, onSelect };
-
-  useImperativeHandle(ref, () => ({
-    fitRoute: () => mapRef.current?.fitBounds(bounds(route.line), { padding: fitPadding(container.current) }),
-  }));
 
   // Create the map once.
   useEffect(() => {
@@ -57,6 +49,10 @@ export const RouteMap = forwardRef<RouteMapHandle, Props>(function RouteMap({ ro
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(
+      fitRouteControl(() => map.fitBounds(bounds(latest.current.route.line), { padding: fitPadding(container.current) })),
+      "top-right",
+    );
     map.on("style.load", () => addRouteLayers(map, latest.current));
 
     let hoveredId: number | null = null;
@@ -102,7 +98,7 @@ export const RouteMap = forwardRef<RouteMapHandle, Props>(function RouteMap({ ro
       <div ref={container} className="size-full" />
     </div>
   );
-});
+}
 
 function addRouteLayers(map: MapLibreMap, { route, selectedId }: { route: RouteData; selectedId: number | null }) {
   map.addSource(SEGMENTS, {
@@ -203,4 +199,24 @@ function segmentAt(map: MapLibreMap, x: number, y: number): number | null {
 function fitPadding(el: HTMLElement | null) {
   const wide = (el?.clientWidth ?? 0) >= 768;
   return wide ? { top: 56, right: 72, bottom: 56, left: 420 } : { top: 150, right: 32, bottom: 32, left: 32 };
+}
+
+// Lucide "maximize-2", inline so the control needs no React rendering.
+const FIT_ICON =
+  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+
+/** "Show the whole route" button, stacked under MapLibre's zoom buttons. */
+function fitRouteControl(onFit: () => void): IControl {
+  const group = document.createElement("div");
+  group.className = "maplibregl-ctrl maplibregl-ctrl-group";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.title = "Show the whole route";
+  button.setAttribute("aria-label", button.title);
+  // Inline: MapLibre's unlayered CSS (`display: block`) would beat Tailwind's layered utilities.
+  button.style.cssText = "display: grid; place-items: center; color: var(--ink)";
+  button.innerHTML = FIT_ICON;
+  button.addEventListener("click", onFit);
+  group.append(button);
+  return { onAdd: () => group, onRemove: () => group.remove() };
 }

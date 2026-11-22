@@ -16,7 +16,6 @@ export interface Segment extends Piece {
 
 export interface RouteData {
   line: LonLat[];
-  cum: number[]; // cumulative km at each vertex of `line`
   lengthKm: number;
   stops: Stop[];
   segments: Segment[];
@@ -58,7 +57,7 @@ export function buildRoute(file: RouteFile, stepKm = 5): RouteData {
 
   const segments = sliceByKm(line, cum, stepKm).map((piece, id) => ({ id, ...piece }));
 
-  return { line, cum, lengthKm: cum[cum.length - 1], stops, segments };
+  return { line, lengthKm: cum[cum.length - 1], stops, segments };
 }
 
 /** "Darwin (State Square)" → "Darwin": the place, without the venue. */

@@ -8,6 +8,7 @@ export class Map {
   readonly handlers: Record<string, Handler[]> = {};
   readonly sources = new Set<string>();
   readonly layers = new Set<string>();
+  readonly controls: { onAdd: (map: Map) => HTMLElement }[] = [];
   setStyle = vi.fn();
   fitBounds = vi.fn();
   setFeatureState = vi.fn();
@@ -26,7 +27,8 @@ export class Map {
     (this.handlers[event] ??= []).push(handler);
     return this;
   }
-  addControl() {
+  addControl(control: { onAdd?: (map: Map) => HTMLElement }) {
+    if (control.onAdd) this.controls.push(control as { onAdd: (map: Map) => HTMLElement });
     return this;
   }
   addSource(id: string) {
