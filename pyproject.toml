@@ -41,7 +41,7 @@ model = [
 ]
 dev = [
     "pytest>=8.3",
-    "ruff>=0.8",
+    "ruff==0.17.4",  # exact: each release can change the format CI checks against
 ]
 
 [tool.setuptools.packages.find]

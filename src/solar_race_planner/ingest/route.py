@@ -173,11 +173,12 @@ def route_through(graph: nx.DiGraph, waypoints: Sequence[Waypoint]) -> Route:
 def _nearest_node(graph: nx.DiGraph, nodes: set[int], wp: Waypoint) -> int:
     """Closest node by equirectangular distance; exact enough to pick a node."""
     cos_lat = math.cos(math.radians(wp.lat))
-    return min(
-        nodes,
-        key=lambda n: ((graph.nodes[n]["lon"] - wp.lon) * cos_lat) ** 2
-        + (graph.nodes[n]["lat"] - wp.lat) ** 2,
-    )
+
+    def squared_distance(n: int) -> float:
+        node = graph.nodes[n]
+        return ((node["lon"] - wp.lon) * cos_lat) ** 2 + (node["lat"] - wp.lat) ** 2
+
+    return min(nodes, key=squared_distance)
 
 
 def _distance_m(a: tuple[float, float], b: tuple[float, float]) -> float:
