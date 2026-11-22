@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt -e ".[dev]"
+      - run: pip install -r requirements.txt -e ".[dev,geo]"
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest

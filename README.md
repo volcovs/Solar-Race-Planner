@@ -19,8 +19,14 @@ Install, once:
 cp .env.example .env
 python3.12 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,geo]"           # geo: the data pipeline (route, rasters)
 cd frontend && npm ci && cd ..
+```
+
+Build the data (network required; outputs go to `data/`, which is git-ignored):
+
+```bash
+python -m solar_race_planner.ingest.route   # race route from OpenStreetMap → data/route/route.parquet
 ```
 
 Run (two terminals, with the venv active for the API):
@@ -34,7 +40,7 @@ Test and lint (run before opening a PR):
 
 ```bash
 ruff check . && ruff format --check .   # lint; `ruff format .` fixes formatting
-pytest                                  # API tests
+pytest                                  # Python tests (offline)
 cd frontend && npm test                 # frontend tests
 ```
 
