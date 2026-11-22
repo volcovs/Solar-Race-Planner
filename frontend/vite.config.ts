@@ -1,9 +1,10 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   base: process.env.VITE_BASE ?? "/",
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     // In dev, /api/* goes to the FastAPI service.
@@ -12,5 +13,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Node 25+ has its own localStorage, which hides jsdom's browser one in tests.
+    execArgv: ["--no-experimental-webstorage"],
   },
 });

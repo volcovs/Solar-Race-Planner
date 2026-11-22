@@ -1,8 +1,110 @@
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+
+/* `dark:` utilities follow the data-theme attribute set in index.html, not the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Design tokens (design/README.md). Components use the Tailwind names below
+ * (bg-surface, text-ink-muted, border-line, ...), never raw colours, so a theme
+ * only changes these values.
+ * Colour meaning: battery = blue, sun and actions = orange, risk = red, safe = green.
+ */
+:root {
+  color-scheme: light;
+  --ground: #f3f5f7;
+  --surface: #ffffff;
+  --surface-muted: #eef1f4;
+  --line: #e2e8f0;
+  --ink: #0f172a;
+  --ink-muted: #475569;
+  --sun: #f97316;
+  --on-sun: #0f172a; /* text and icons on a sun background; white would be only 2.8:1 */
+  --sun-ink: #c2410c; /* orange text on light backgrounds (4.5:1) */
+  --sun-band: #fed7aa;
+  --battery: #1d4ed8;
+  --battery-band: #bfdbfe;
+  --good: #166534;
+  --risk: #dc2626;
+  --focus: #1d4ed8;
+  --route: #2563eb; /* the route line on the map */
+  --map-casing: #ffffff; /* outline under the route line */
 }
 
-main {
-  padding: 24px 16px;
+[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0b1120;
+  --surface: #111827;
+  --surface-muted: #1a2333;
+  --line: #263247;
+  --ink: #e6eaf0;
+  --ink-muted: #9aa5b5;
+  --sun: #fb923c;
+  --on-sun: #0f172a;
+  --sun-ink: #fdba74;
+  --sun-band: #4a2a12;
+  --battery: #60a5fa;
+  --battery-band: #1e3a5f;
+  --good: #4ade80;
+  --risk: #f87171;
+  --focus: #60a5fa;
+  --route: #60a5fa;
+  --map-casing: #0b1120;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-sun: var(--sun);
+  --color-on-sun: var(--on-sun);
+  --color-sun-ink: var(--sun-ink);
+  --color-sun-band: var(--sun-band);
+  --color-battery: var(--battery);
+  --color-battery-band: var(--battery-band);
+  --color-good: var(--good);
+  --color-risk: var(--risk);
+  --color-focus: var(--focus);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-control: 10px;
+  --radius-card: 14px;
+}
+
+@layer base {
+  body {
+    @apply bg-ground font-sans text-ink antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
+}
+
+/* MapLibre's own controls (zoom, attribution) in our tokens, so they follow the theme. */
+.maplibregl-ctrl-group {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
+}
+/* Scoped under .maplibregl-map to outrank MapLibre's own rules, which load after ours. */
+.maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--ink-muted);
+}
+.maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+[data-theme="dark"] .maplibregl-ctrl-icon,
+[data-theme="dark"] .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
 }

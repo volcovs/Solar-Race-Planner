@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { App } from "./App";
+import { StatusPill } from "./StatusPill";
 
 // fetch is mocked, so no backend needs to run.
 function mockFetch(ok: boolean, body: unknown = {}) {
@@ -9,16 +9,19 @@ function mockFetch(ok: boolean, body: unknown = {}) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("App", () => {
-  it("shows the API health", async () => {
+describe("StatusPill", () => {
+  it("shows the API version when it answers", async () => {
     mockFetch(true, { status: "ok", version: "0.1.0" });
-    render(<App />);
-    expect(await screen.findByText("API ok · v0.1.0")).toBeInTheDocument();
+    render(<StatusPill />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Checking API…");
+    expect(await screen.findByText("API online · v0.1.0")).toBeInTheDocument();
   });
 
   it("says so when the API is down", async () => {
     mockFetch(false);
-    render(<App />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("API unavailable");
+    render(<StatusPill />);
+
+    expect(await screen.findByText("API offline")).toBeInTheDocument();
   });
 });
