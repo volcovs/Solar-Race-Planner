@@ -1,0 +1,52 @@
+// Stand-in for maplibre-gl in tests: jsdom has no WebGL. Records what the app asks the map to do.
+import { vi } from "vitest";
+
+type Handler = (event?: unknown) => void;
+
+export class Map {
+  static instances: Map[] = [];
+  readonly handlers: Record<string, Handler[]> = {};
+  readonly sources = new Set<string>();
+  readonly layers = new Set<string>();
+  setStyle = vi.fn();
+  fitBounds = vi.fn();
+  setFeatureState = vi.fn();
+  queryRenderedFeatures = vi.fn((): { id?: number }[] => []);
+
+  constructor(readonly options: { style: string }) {
+    Map.instances.push(this);
+  }
+
+  /** Fire a map event as MapLibre would. */
+  emit(event: string, payload?: unknown) {
+    for (const handler of this.handlers[event] ?? []) handler(payload);
+  }
+
+  on(event: string, handler: Handler) {
+    (this.handlers[event] ??= []).push(handler);
+    return this;
+  }
+  addControl() {
+    return this;
+  }
+  addSource(id: string) {
+    this.sources.add(id);
+  }
+  addLayer({ id }: { id: string }) {
+    this.layers.add(id);
+  }
+  getSource(id: string) {
+    return this.sources.has(id) ? {} : undefined;
+  }
+  getLayer(id: string) {
+    return this.layers.has(id) ? {} : undefined;
+  }
+  getCanvas() {
+    return document.createElement("canvas");
+  }
+  remove() {}
+}
+
+export class NavigationControl {}
+
+export const setWorkerUrl = vi.fn();

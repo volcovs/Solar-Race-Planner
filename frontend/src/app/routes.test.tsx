@@ -15,10 +15,11 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("routes", () => {
-  it.each(SECTIONS)("$path shows its page and marks its tab as current", (section) => {
+  it.each(SECTIONS)("$path shows its page and marks its tab as current", async (section) => {
     renderAt(section.path);
 
-    expect(screen.getByRole("heading", { level: 1, name: section.title })).toBeInTheDocument();
+    // findBy: some pages (the map) load on demand.
+    expect(await screen.findByRole("heading", { level: 1, name: section.title })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: section.label })).toHaveAttribute("aria-current", "page");
   });
