@@ -1,19 +1,31 @@
-# BWSC race rules used by the race-rule engine
+# BWSC race rules and route. km values: 2025 BWSC Route Notes V1.0 (docs/bwsc-facts.md [12]).
+# Coordinates: route notes for the start; OpenStreetMap features for the other places.
 name: bwsc-2025-route
-start: Darwin
-finish: Adelaide
-finish_km: 3026.9
 driving_window: ["08:00", "17:00"]
 control_stop_minutes: 30
-control_stops:   # km from Darwin
-  - {name: Katherine, km: 322}
-  - {name: Dunmarra, km: 631}
-  - {name: Tennant Creek, km: 988}
-  - {name: Barrow Creek, km: 1212}
-  - {name: Alice Springs, km: 1496}
-  - {name: Erldunda, km: 1694}
-  - {name: Coober Pedy, km: 2181}
-  - {name: Glendambo, km: 2434}
-  - {name: Port Augusta, km: 2720.5}
 # Battery packs are sealed overnight (19:15–06:15)
 static_charging_windows: [["06:15", "08:00"], ["17:00", "19:15"]]
+
+# lat/lon only where the stop is off the highway or at a known venue; those become route
+# waypoints and are checked against their official km. Stops without them are on the highway.
+control_stops:
+  - {name: Katherine, km: 322}                                       # venue not given in the notes
+  - {name: Dunmarra, km: 631, lat: -16.68025, lon: 133.41308}        # Dunmarra Wayside Inn
+  - {name: Tennant Creek, km: 988, lat: -19.65767, lon: 134.18867}   # approx.: Kathleen St (notes: Kathleen St → Weaber St)
+  - {name: Barrow Creek, km: 1212.3, lat: -21.53133, lon: 133.88936} # Barrow Creek Hotel
+  - {name: Alice Springs, km: 1496, lat: -23.71102, lon: 133.87367}  # Aquatic & Leisure Centre car park
+  - {name: Erldunda, km: 1694, lat: -25.19767, lon: 133.20078}       # Erldunda Roadhouse
+  - {name: Coober Pedy, km: 2181, lat: -29.01488, lon: 134.75574}    # off Hutchison St, District Council
+  - {name: Glendambo, km: 2434, lat: -30.96771, lon: 135.74960}      # Glendambo Roadhouse
+  - {name: Port Augusta, km: 2720.5, lat: -32.49234, lon: 137.77109} # Central Oval
+
+# Route geometry (ticket DAT-01): solar_race_planner.ingest.route
+route:
+  start: {name: Darwin (State Square), km: 0, lat: -12.46306, lon: 130.83781}
+  finish: {name: Adelaide (Victoria Park), km: 3026.92, lat: -34.93388, lon: 138.61979}
+  via: []                  # extra {name, km, lat, lon} points to force a street the notes require
+  highway_refs: [A1, A87]  # Stuart Highway (A1 to Daly Waters, then A87) and Highway 1 to Adelaide
+  local_radius_m: 1500     # all drivable roads this close to a waypoint (control-stop detours)
+  urban_areas:             # main roads inside these circles (city streets between highway and start/finish)
+    - {name: Darwin, lat: -12.44, lon: 130.88, radius_m: 15000}
+    - {name: Adelaide, lat: -34.85, lon: 138.60, radius_m: 15000}

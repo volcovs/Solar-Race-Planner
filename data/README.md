@@ -1,12 +1,20 @@
 # data/
 
-Local cache for pipeline outputs: route segments, forecasts, plans, back-tests.
-Everything here except this file is git-ignored. Seed it with the pipeline scripts.
-Hosted deployments keep durable results in PostGIS (Neon); this folder is only a working cache.
+Local cache for pipeline outputs: route, forecasts, plans, back-tests.
+Everything here except this file is git-ignored. Build it with the pipeline commands
+in the main README; formats are in `docs/data-contracts.md`.
 
 ```
 data/
-  route/segments.parquet
-  forecasts/solar_forecast_<issue_time>.parquet
-  plans/<plan_id>.parquet + .json
+  route/route.parquet          race route (DAT-01)
+  route/raw/overpass.json      cached OpenStreetMap download
+  forecasts/                   (later tickets)
+  plans/                       (later tickets)
+```
+
+`frontend/public/sample/route.geojson` is a small, simplified copy of the route for the
+web app until the API serves it. Rebuild it with:
+
+```bash
+python -m solar_race_planner.ingest.route --geojson frontend/public/sample/route.geojson
 ```

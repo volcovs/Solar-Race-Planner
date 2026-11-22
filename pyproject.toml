@@ -22,15 +22,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Satellite and geospatial stack (DAT-*, BE-10). Heavy; install when you work on these.
+# Geospatial stack for the data pipeline (DAT-*). Add raster/STAC libraries with the tickets that use them.
 geo = [
-    "pystac-client>=0.8",
-    "odc-stac>=0.3",
-    "rioxarray>=0.17",
     "geopandas>=1.0",
-    "shapely>=2.0",
+    "networkx>=3.4",
     "pyproj>=3.7",
-    "osmnx>=2.0",
+    "shapely>=2.0",
 ]
 # Google Earth Engine (DAT-05, DAT-12): cloud-side composites and sampling.
 gee = [
@@ -44,7 +41,7 @@ model = [
 ]
 dev = [
     "pytest>=8.3",
-    "ruff>=0.8",
+    "ruff==0.17.4",  # exact: each release can change the format CI checks against
 ]
 
 [tool.setuptools.packages.find]
