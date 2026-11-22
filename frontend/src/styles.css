@@ -28,9 +28,8 @@
   --good: #166534;
   --risk: #dc2626;
   --focus: #1d4ed8;
-  --speed-low: #60a5fa;
-  --speed-mid: #2563eb;
-  --speed-high: #1e3a8a;
+  --route: #2563eb; /* the route line on the map */
+  --map-casing: #ffffff; /* outline under the route line */
 }
 
 [data-theme="dark"] {
@@ -50,9 +49,8 @@
   --good: #4ade80;
   --risk: #f87171;
   --focus: #60a5fa;
-  --speed-low: #93c5fd;
-  --speed-mid: #3b82f6;
-  --speed-high: #1d4ed8;
+  --route: #60a5fa;
+  --map-casing: #0b1120;
 }
 
 @theme inline {
@@ -71,9 +69,6 @@
   --color-good: var(--good);
   --color-risk: var(--risk);
   --color-focus: var(--focus);
-  --color-speed-low: var(--speed-low);
-  --color-speed-mid: var(--speed-mid);
-  --color-speed-high: var(--speed-high);
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
@@ -90,4 +85,26 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-focus;
   }
+}
+
+/* MapLibre's own controls (zoom, attribution) in our tokens, so they follow the theme. */
+.maplibregl-ctrl-group {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--line);
+}
+/* Scoped under .maplibregl-map to outrank MapLibre's own rules, which load after ours. */
+.maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--ink-muted);
+}
+.maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+[data-theme="dark"] .maplibregl-ctrl-icon,
+[data-theme="dark"] .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
 }

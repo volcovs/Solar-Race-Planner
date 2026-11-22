@@ -1,10 +1,9 @@
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 /** Page heading; also sets the browser tab title. */
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
-  useEffect(() => {
-    document.title = `${title} · Solar Race Planner`;
-  }, [title]);
+  useDocumentTitle(title);
 
   return (
     <header className="mb-6">
