@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hashlib
 import json
 import math
@@ -8,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import httpx
 import pandas as pd
@@ -16,6 +14,7 @@ import pandas as pd
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 MAX_REQUESTS = 5
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[3] / "data" / "forecasts" / "raw"
 
 WEATHER_VARIABLES: tuple[str, ...] = (
     "shortwave_radiation",
@@ -31,13 +30,14 @@ WEATHER_VARIABLES: tuple[str, ...] = (
 OUTPUT_COLUMNS: tuple[str, ...] = (
     "point_id",
     "time_utc",
+    "step_minutes",
     *WEATHER_VARIABLES,
     "model",
     "issue_time_utc",
     "request_url",
 )
 
-Resolution = Literal["auto", "hourly", "minutely_15"]
+Resolution = Literal["hourly", "minutely_15"]
 
 
 @dataclass(frozen=True)
@@ -53,27 +53,30 @@ class OpenMeteoClient:
     def __init__(
         self,
         base_url: str = OPEN_METEO_FORECAST_URL,
-        cache_dir: Path | None = Path("data/forecasts/raw"),
+        cache_dir: Path | None = DEFAULT_CACHE_DIR,
+        cache_ttl_seconds: float | None = 1800.0,  # 30 minutes
         max_requests: int = MAX_REQUESTS,
         max_retries: int = 4,
         backoff_base_seconds: float = 1.0,
+        max_retry_delay_seconds: float = 60.0,
         timeout_seconds: float = 30.0,
         http_client: httpx.Client | None = None,
         sleep_fn: Callable[[float], None] = time.sleep,
+        now_fn: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.base_url = base_url
         self.cache_dir = cache_dir
+        self.cache_ttl_seconds = cache_ttl_seconds
         self.max_requests = max_requests
         self.max_retries = max_retries
         self.backoff_base_seconds = backoff_base_seconds
+        self.max_retry_delay_seconds = max_retry_delay_seconds
         self._sleep = sleep_fn
+        self._now = now_fn
         self._owns_client = http_client is None
         self._client = http_client or httpx.Client(timeout=timeout_seconds)
 
-        if self.cache_dir is not None:
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    def __enter__(self) -> OpenMeteoClient:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -87,26 +90,33 @@ class OpenMeteoClient:
         self,
         points: Sequence[RoutePoint],
         *,
-        resolution: Resolution = "auto",
+        resolution: Resolution = "hourly",
         model: str = "best_match",
         forecast_days: int = 7,
-        wind_speed_unit: Literal["kmh", "ms"] = "kmh",
         use_cache: bool = True,
     ) -> pd.DataFrame:
         """Fetch weather forecasts for route points in at most `max_requests` HTTP calls.
 
-        Returns a tidy DataFrame with one row per (point_id, time_utc).
-        Note: Open-Meteo irradiance values (GHI, DNI, DHI) are averages over the
-        preceding time step, not instantaneous values at `time_utc`.
+        Units: irradiance W/m², wind speed and gusts m/s (always requested as such),
+        wind direction degrees, temperature °C, cloud cover %.
+
+        Irradiance values (GHI, DNI, DHI) are averages over the preceding `step_minutes`
+        interval, not instantaneous.
+
+        `resolution="minutely_15"` is native only in Europe and North America; elsewhere
+        (e.g. Australia) Open-Meteo interpolates it from hourly data, so prefer "hourly".
+
+        `issue_time_utc` is when the batch was fetched (or cached), not the model run time.
+        `model` is the model requested, not necessarily the one `best_match` resolved to.
         """
+        if resolution not in ("hourly", "minutely_15"):
+            raise ValueError(f"Unsupported resolution: {resolution!r}")
+
         if not points:
             return pd.DataFrame(columns=list(OUTPUT_COLUMNS))
 
-        if resolution not in ("auto", "hourly", "minutely_15"):
-            raise ValueError(f"Unsupported resolution: {resolution!r}")
-
-        # Split N points evenly across at most `max_requests` batches to stay
-        # within fair-use limits and avoid overly long query strings.
+        # Split N points across at most `max_requests` batches to stay within
+        # fair-use limits and avoid overly long query strings.
         batch_size = max(60, math.ceil(len(points) / self.max_requests))
         batches = [points[i : i + batch_size] for i in range(0, len(points), batch_size)]
 
@@ -116,7 +126,6 @@ class OpenMeteoClient:
                 resolution=resolution,
                 model=model,
                 forecast_days=forecast_days,
-                wind_speed_unit=wind_speed_unit,
                 use_cache=use_cache,
             )
             for batch in batches
@@ -130,24 +139,17 @@ class OpenMeteoClient:
         resolution: Resolution,
         model: str,
         forecast_days: int,
-        wind_speed_unit: str,
         use_cache: bool,
     ) -> pd.DataFrame:
-        vars_csv = ",".join(WEATHER_VARIABLES)
-        params: dict[str, str] = {
+        params = {
             "latitude": ",".join(f"{p.lat:.5f}" for p in batch),
             "longitude": ",".join(f"{p.lon:.5f}" for p in batch),
+            resolution: ",".join(WEATHER_VARIABLES),
             "models": model,
             "forecast_days": str(forecast_days),
             "timezone": "UTC",
-            "wind_speed_unit": wind_speed_unit,
+            "wind_speed_unit": "ms",
         }
-        if resolution == "auto":
-            params["minutely_15"] = vars_csv
-            params["hourly"] = vars_csv
-        else:
-            params[resolution] = vars_csv
-
         request = self._client.build_request("GET", self.base_url, params=params)
         request_url = str(request.url)
 
@@ -173,26 +175,50 @@ class OpenMeteoClient:
         use_cache: bool,
     ) -> tuple[Any, pd.Timestamp]:
         cache_file = self._cache_path(request_url)
-        if use_cache and cache_file is not None and cache_file.exists():
-            cached = json.loads(cache_file.read_text(encoding="utf-8"))
-            return cached["payload"], pd.Timestamp(cached["issue_time_utc"])
+        now_utc = pd.Timestamp(self._now()).tz_convert("UTC").floor("s").as_unit("s")
+
+        if use_cache and cache_file is not None:
+            cached = self._read_cache(cache_file, now_utc)
+            if cached is not None:
+                return cached
 
         response = self._send_with_retry(request)
         payload = response.json()
-        issue_time_utc = pd.Timestamp(datetime.now(UTC)).floor("s")
 
         if cache_file is not None:
-            cache_file.write_text(
-                json.dumps(
-                    {
-                        "issue_time_utc": issue_time_utc.isoformat(),
-                        "request_url": request_url,
-                        "payload": payload,
-                    }
-                ),
-                encoding="utf-8",
-            )
-        return payload, issue_time_utc
+            self._write_cache(cache_file, request_url, payload, now_utc)
+        return payload, now_utc
+
+    def _read_cache(self, cache_file: Path, now_utc: pd.Timestamp) -> tuple[Any, pd.Timestamp] | None:
+        """Return (payload, issue_time) if the cache entry is valid and fresh, else None."""
+        try:
+            cached = json.loads(cache_file.read_text(encoding="utf-8"))
+            cached_time = pd.Timestamp(cached["issue_time_utc"]).tz_convert("UTC").as_unit("s")
+            payload = cached["payload"]
+        except (OSError, ValueError, KeyError, TypeError):
+            # Missing, unreadable or corrupt entry (json.JSONDecodeError is a ValueError).
+            return None
+
+        age_seconds = (now_utc - cached_time).total_seconds()
+        if self.cache_ttl_seconds is None or age_seconds <= self.cache_ttl_seconds:
+            return payload, cached_time
+        return None
+
+    @staticmethod
+    def _write_cache(cache_file: Path, request_url: str, payload: Any, issue_time_utc: pd.Timestamp) -> None:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp_file = cache_file.with_suffix(".json.tmp")
+        tmp_file.write_text(
+            json.dumps(
+                {
+                    "issue_time_utc": issue_time_utc.isoformat(),
+                    "request_url": request_url,
+                    "payload": payload,
+                }
+            ),
+            encoding="utf-8",
+        )
+        tmp_file.replace(cache_file)  # atomic on the same filesystem
 
     def _send_with_retry(self, request: httpx.Request) -> httpx.Response:
         """Send an HTTP request with exponential back-off on 429/5xx and transport errors."""
@@ -208,25 +234,24 @@ class OpenMeteoClient:
                 if attempt == self.max_retries:
                     response.raise_for_status()
 
-                delay = self._retry_delay(response, attempt)
-                self._sleep(delay)
+                self._sleep(self._retry_delay(response, attempt))
             except httpx.TransportError as exc:
                 last_exc = exc
                 if attempt == self.max_retries:
                     raise
-                self._sleep(self.backoff_base_seconds * (2**attempt))
+                delay = min(self.max_retry_delay_seconds, self.backoff_base_seconds * (2**attempt))
+                self._sleep(delay)
 
-        # Unreachable, kept for type-checker completeness.
         raise RuntimeError("Retry loop exited unexpectedly") from last_exc
 
     def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
         retry_after = response.headers.get("Retry-After")
         if retry_after is not None:
             try:
-                return max(0.0, float(retry_after))
+                return min(self.max_retry_delay_seconds, max(0.0, float(retry_after)))
             except ValueError:
                 pass
-        return self.backoff_base_seconds * (2**attempt)
+        return min(self.max_retry_delay_seconds, self.backoff_base_seconds * (2**attempt))
 
     def _parse_batch_payload(
         self,
@@ -243,9 +268,17 @@ class OpenMeteoClient:
         if len(items) != len(batch):
             raise ValueError(f"Expected {len(batch)} location results from Open-Meteo, got {len(items)}")
 
+        step_minutes = 15 if resolution == "minutely_15" else 60
         point_frames: list[pd.DataFrame] = []
         for point, item in zip(batch, items, strict=True):
-            df_point = self._extract_point_frame(item=item, point=point, resolution=resolution)
+            if resolution not in item:
+                raise KeyError(
+                    f"Resolution {resolution!r} missing from response for point {point.point_id!r}"
+                )
+
+            df_point = pd.DataFrame(item[resolution]).rename(columns={"time": "time_utc"})
+            df_point["time_utc"] = pd.to_datetime(df_point["time_utc"], utc=True)
+            df_point["step_minutes"] = step_minutes
             df_point["point_id"] = str(point.point_id)
             df_point["model"] = model
             df_point["issue_time_utc"] = issue_time_utc
@@ -253,51 +286,6 @@ class OpenMeteoClient:
             point_frames.append(df_point)
 
         return pd.concat(point_frames, ignore_index=True)[list(OUTPUT_COLUMNS)]
-
-    def _extract_point_frame(
-        self,
-        *,
-        item: dict[str, Any],
-        point: RoutePoint,
-        resolution: Resolution,
-    ) -> pd.DataFrame:
-        """Build a point DataFrame, falling back from 15-min to hourly when resolution='auto'."""
-        if resolution != "auto":
-            if resolution not in item:
-                raise KeyError(
-                    f"Resolution {resolution!r} missing from response for point {point.point_id!r}"
-                )
-            df = pd.DataFrame(item[resolution]).rename(columns={"time": "time_utc"})
-            df["time_utc"] = pd.to_datetime(df["time_utc"], utc=True)
-            return df
-
-        weather_cols = list(WEATHER_VARIABLES)
-        df_15: pd.DataFrame | None = None
-        if "minutely_15" in item:
-            candidate = pd.DataFrame(item["minutely_15"]).rename(columns={"time": "time_utc"})
-            candidate["time_utc"] = pd.to_datetime(candidate["time_utc"], utc=True)
-            # Keep only 15-min rows where at least one weather variable is non-null.
-            valid_15 = candidate.dropna(subset=weather_cols, how="all")
-            if not valid_15.empty:
-                df_15 = valid_15
-
-        df_hourly: pd.DataFrame | None = None
-        if "hourly" in item:
-            df_hourly = pd.DataFrame(item["hourly"]).rename(columns={"time": "time_utc"})
-            df_hourly["time_utc"] = pd.to_datetime(df_hourly["time_utc"], utc=True)
-
-        if df_15 is not None and df_hourly is not None:
-            # Use 15-min data where available, and hourly for timestamps beyond it.
-            last_15_time = df_15["time_utc"].max()
-            hourly_tail = df_hourly[df_hourly["time_utc"] > last_15_time]
-            return pd.concat([df_15, hourly_tail], ignore_index=True)
-
-        if df_15 is not None:
-            return df_15
-        if df_hourly is not None:
-            return df_hourly
-
-        raise KeyError(f"Neither 'minutely_15' nor 'hourly' found for point {point.point_id!r}")
 
     def _cache_path(self, request_url: str) -> Path | None:
         if self.cache_dir is None:
