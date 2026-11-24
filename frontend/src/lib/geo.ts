@@ -60,6 +60,26 @@ export function sliceByKm(line: LonLat[], cum: number[], stepKm: number): Piece[
   return pieces;
 }
 
+/** km of the point on `piece` nearest to the point (flat-earth: a piece is only a few km long). */
+export function kmAlong(piece: Piece, [lon, lat]: LonLat): number {
+  const cosLat = Math.cos(toRad(lat));
+  let best = { gap: Infinity, along: 0 };
+  let walked = 0;
+  for (let i = 1; i < piece.coords.length; i++) {
+    const [ax, ay] = piece.coords[i - 1];
+    const [bx, by] = piece.coords[i];
+    const dx = (bx - ax) * cosLat;
+    const dy = by - ay;
+    const length = Math.hypot(dx, dy);
+    const t = length === 0 ? 0 : Math.max(0, Math.min(1, (((lon - ax) * cosLat) * dx + (lat - ay) * dy) / length ** 2));
+    const gap = Math.hypot((lon - ax) * cosLat - t * dx, lat - ay - t * dy);
+    if (gap < best.gap) best = { gap, along: walked + t * length };
+    walked += length;
+  }
+  const share = walked === 0 ? 0 : best.along / walked;
+  return piece.kmStart + share * (piece.kmEnd - piece.kmStart);
+}
+
 /** [[west, south], [east, north]] of the line. */
 export function bounds(line: LonLat[]): [LonLat, LonLat] {
   const lons = line.map(([lon]) => lon);

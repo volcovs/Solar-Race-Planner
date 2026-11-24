@@ -16,6 +16,7 @@ export interface Segment extends Piece {
 
 export interface RouteData {
   line: LonLat[];
+  cumKm: number[]; // km from the start at each vertex of `line`
   lengthKm: number;
   stops: Stop[];
   segments: Segment[];
@@ -57,12 +58,17 @@ export function buildRoute(file: RouteFile, stepKm = 5): RouteData {
 
   const segments = sliceByKm(line, cum, stepKm).map((piece, id) => ({ id, ...piece }));
 
-  return { line, lengthKm: cum[cum.length - 1], stops, segments };
+  return { line, cumKm: cum, lengthKm: cum[cum.length - 1], stops, segments };
 }
 
 /** "Darwin (State Square)" → "Darwin": the place, without the venue. */
 export function placeName(name: string): string {
   return name.replace(/\s*\(.*\)$/, "");
+}
+
+/** The stretch that contains `km` (the last one for km at or past the finish). */
+export function segmentAtKm(route: RouteData, km: number): Segment | undefined {
+  return route.segments.find((s) => km < s.kmEnd) ?? route.segments.at(-1);
 }
 
 /** The first stop at or after `km`, if any. */

@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routes } from "../app/routes";
 import { ROUTE_FILE } from "../test/fixtures";
+import { Chart as FakeChart } from "../test/echartsMock";
 import { Map as FakeMap } from "../test/maplibreMock";
 
 function respondWith(routeFile: unknown, ok = true) {
@@ -24,8 +25,18 @@ async function openMap() {
   return { map };
 }
 
+/** The page with its timeline drawn from the mocked plan. */
+async function openTimeline() {
+  const { map } = await openMap();
+  await screen.findByRole("img", { name: /along the route/ });
+  return { map, chart: FakeChart.instances.at(-1)! };
+}
+
+const cursorCard = () => screen.queryByRole("region", { name: "At the cursor" });
+
 beforeEach(() => {
   FakeMap.instances.length = 0;
+  FakeChart.instances.length = 0;
   document.documentElement.dataset.theme = "light";
   respondWith(ROUTE_FILE);
 });
@@ -38,7 +49,7 @@ describe("MapPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Route map" })).toBeInTheDocument();
     expect(screen.getByText(/· 1 control stop$/)).toBeInTheDocument();
     expect(map.options.style).toContain("positron");
-    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "stops-label"]);
+    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "stops-label", "cursor"]);
   });
 
 
@@ -86,5 +97,76 @@ describe("MapPage", () => {
     render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/map"] })} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load the route (Route data: 404)");
+  });
+
+  describe("timeline", () => {
+    it("draws battery, speed, sun and wind under the map", async () => {
+      const { chart } = await openTimeline();
+
+      expect(screen.getByRole("heading", { name: "Race timeline" })).toBeInTheDocument();
+      // SoC band (floor + width), planned SoC, speed, irradiance, headwind, tailwind.
+      expect(chart.option.series).toHaveLength(7);
+      expect(cursorCard()).not.toBeInTheDocument();
+    });
+
+    it("follows the cursor on the map", async () => {
+      const { map, chart } = await openTimeline();
+      map.queryRenderedFeatures.mockReturnValue([{ id: 2 }]); // the stretch km 10–15
+
+      act(() => map.emit("mousemove", { point: { x: 1, y: 1 }, lngLat: { lng: 0.11, lat: 0 } }));
+
+      expect(cursorCard()).toHaveTextContent(/km 1[0-5]/);
+      expect(chart.dispatchAction).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: "updateAxisPointer", currTrigger: "mousemove" }),
+        { silent: true },
+      );
+
+      act(() => map.emit("mouseout"));
+      expect(cursorCard()).not.toBeInTheDocument();
+      expect(chart.dispatchAction).toHaveBeenLastCalledWith({ type: "updateAxisPointer", currTrigger: "leave" }, { silent: true });
+    });
+
+    it("moves the dot on the map with the chart's cursor, and picks that stretch on click", async () => {
+      const { map, chart } = await openTimeline();
+
+      act(() => chart.emit("updateAxisPointer", { axesInfo: [{ axisDim: "x", value: 100 }] }));
+
+      expect(cursorCard()).toHaveTextContent("km 100");
+      expect(cursorCard()).toHaveTextContent("Middle in 50 km");
+      const dot = map.sources.get("cursor")!.setData.mock.lastCall![0];
+      expect(dot.features[0].geometry.type).toBe("Point");
+
+      act(() => chart.zrHandlers.click.forEach((handler) => handler()));
+      expect(screen.getByRole("heading", { name: "km 100–105" })).toBeInTheDocument();
+    });
+
+    it("can be driven from the keyboard", async () => {
+      const { chart } = await openTimeline();
+      const timeline = screen.getByRole("img", { name: /along the route/ });
+
+      fireEvent.keyDown(timeline, { key: "ArrowRight" });
+      fireEvent.keyDown(timeline, { key: "ArrowRight" });
+      expect(cursorCard()).toHaveTextContent("km 20");
+      expect(chart.dispatchAction).toHaveBeenLastCalledWith(expect.objectContaining({ currTrigger: "mousemove" }), { silent: true });
+
+      // Held keys repeat faster than the page re-renders; each press still builds on the last.
+      act(() => {
+        timeline.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+        timeline.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      });
+      expect(cursorCard()).toHaveTextContent("km 324");
+
+      fireEvent.keyDown(timeline, { key: "Escape" });
+      expect(cursorCard()).not.toBeInTheDocument();
+    });
+
+    it("can be hidden to give the map the room", async () => {
+      await openTimeline();
+
+      fireEvent.click(screen.getByRole("button", { name: "Hide the timeline" }));
+
+      expect(screen.getByRole("button", { name: "Show the timeline" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("img", { name: /along the route/, hidden: true })).not.toBeVisible();
+    });
   });
 });

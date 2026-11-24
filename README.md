@@ -36,6 +36,8 @@ uvicorn solar_race_planner.serve.app:app --reload   # API on http://localhost:80
 cd frontend && npm run dev                          # web app on http://localhost:5173
 ```
 
+**Once the API serves actual data, rebuild the project and run with `VITE_API_MOCK=false`.**
+
 Test and lint (run before opening a PR):
 
 ```bash
