@@ -33,6 +33,7 @@ export function simulate(route: RouteData) {
     created_at: new Date(START_UTC - 12 * HOUR_MS).toISOString(),
     timezone: TIMEZONE,
     min_soc: 0.1,
+    stops: route.stops.map(({ kind, name, km }) => ({ kind, name, km })),
     days: [],
     km: [],
     time_utc: [],
@@ -45,26 +46,31 @@ export function simulate(route: RouteData) {
 
   const stopsAhead = route.stops.filter((s) => s.kind === "control_stop").map((s) => s.km);
   let t = START_UTC;
+  let departAt = t; // later than `t` when the car stops at this km
   let soc = 1;
   let day = { day: 1, start_km: 0 };
 
   for (let km = 0; ; km = Math.min(km + STEP_KM, route.lengthKm)) {
     const [lon, lat] = pointAtKm(route.line, route.cumKm, km);
+    const arrival = { t, soc, ghi: irradiance(lat, lon, t, km) };
+    soc = charge(soc, parkedWh(lat, lon, t, departAt, km));
+    t = departAt;
+
     const ghi = irradiance(lat, lon, t, km);
     const headwind = 3 * Math.sin(km / 180) + 2 * Math.sin(km / 53 + 2);
-    // Slow down when the battery is under a straight line from full to 15% at the finish.
-    const target = 1 - 0.85 * (km / route.lengthKm);
+    // Slow down when the battery is under a straight line from full to 25% at the finish.
+    const target = 1 - 0.75 * (km / route.lengthKm);
     const speed = clamp(80 + 300 * (soc - target), 40, 110);
     const spread = 0.02 + 0.1 * (km / route.lengthKm);
 
     plan.km.push(km);
-    plan.time_utc.push(new Date(t).toISOString());
+    plan.time_utc.push(new Date(arrival.t).toISOString());
     plan.speed_kmh.push(speed);
-    plan.soc.push(soc);
-    plan.soc_p10.push(clamp(soc - spread, 0, 1));
-    plan.soc_p90.push(clamp(soc + spread, 0, 1));
+    plan.soc.push(arrival.soc);
+    plan.soc_p10.push(clamp(arrival.soc - spread, 0, 1));
+    plan.soc_p90.push(clamp(arrival.soc + spread, 0, 1));
     forecast.km.push(km);
-    forecast.ghi_w_m2.push(ghi);
+    forecast.ghi_w_m2.push(arrival.ghi);
     forecast.headwind_ms.push(headwind);
     if (km >= route.lengthKm) break;
 
@@ -72,18 +78,16 @@ export function simulate(route: RouteData) {
     soc = charge(soc, (solarW(ghi) - drivingW(speed / 3.6, headwind)) * hours);
     t += hours * HOUR_MS;
 
-    let stopUntil = t;
+    departAt = t;
     if (stopsAhead.length > 0 && km + STEP_KM >= stopsAhead[0]) {
       stopsAhead.shift();
-      stopUntil = t + CONTROL_STOP_H * HOUR_MS;
+      departAt += CONTROL_STOP_H * HOUR_MS;
     }
-    if (localHour(stopUntil) >= DRIVE_UNTIL_H) {
+    if (localHour(departAt) >= DRIVE_UNTIL_H) {
       plan.days.push({ ...day, end_km: km + STEP_KM });
       day = { day: day.day + 1, start_km: km + STEP_KM };
-      stopUntil = nextMorning(stopUntil);
+      departAt = nextMorning(departAt);
     }
-    soc = charge(soc, parkedWh(lat, lon, t, stopUntil, km));
-    t = stopUntil;
   }
   plan.days.push({ ...day, end_km: route.lengthKm });
   return { plan, forecast };

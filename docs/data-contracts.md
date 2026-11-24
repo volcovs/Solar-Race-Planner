@@ -40,6 +40,7 @@ are ISO 8601 UTC strings.
 | `plan_id`, `created_at` | string | Which plan, and when it was made |
 | `timezone` | string | IANA zone of the race (e.g. `Australia/Darwin`), for local clock times |
 | `min_soc` | number | The car's battery floor (0–1), from its profile; the UI warns where `soc_p10` falls below it |
+| `stops` | `{kind, name, km}[]` | The start, control stops and finish the plan was made for, in race order (`kind`: `start`, `control_stop` or `finish`) |
 | `days` | `{day, start_km, end_km}[]` | Where each race day starts and ends |
 | `km` | number[] | Samples along the route, finer than 1 km |
 | `time_utc` | string[] | Planned time at each km |
