@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { dayAt, daySummaries, raceClock, sample, stages, timeAt, valueAt, zoneLabel, type PlanResponse } from "./plan";
+import {
+  compareStops,
+  dayAt,
+  daySummaries,
+  lowestSocFrom,
+  raceClock,
+  raceTimeToUtc,
+  sample,
+  stages,
+  timeAt,
+  valueAt,
+  zoneLabel,
+  type PlanResponse,
+} from "./plan";
 
 const kms = [0, 0.5, 1, 1.5, 2.2];
 const values = [10, 20, 30, 40, 50];
@@ -88,6 +101,30 @@ describe("stages, day summaries and the race clock", () => {
       { day: 1, endKm: 100, minSoc: 0.6, minP10: 0.5, safe: true },
       { day: 2, endKm: 200, minSoc: 0.3, minP10: 0.05, safe: false },
     ]);
+  });
+
+  it("turns a race day and local clock time into an instant", () => {
+    // Day 1 is 24 August in Darwin (the plan starts 08:30 local, 23:00 UTC the day before).
+    expect(raceTimeToUtc(plan, 1, "08:30").toISOString()).toBe("2025-08-23T23:00:00.000Z");
+    expect(raceTimeToUtc(plan, 2, "10:00").toISOString()).toBe("2025-08-25T00:30:00.000Z");
+  });
+
+  it("compares a re-plan with the previous plan, stop by stop", () => {
+    // The car re-plans at km 150 with less battery, and reaches the finish an hour later.
+    const after = {
+      ...plan,
+      stops: [{ kind: "start", name: "Re-plan point", km: 150 }, plan.stops[2]],
+      km: [150, 200],
+      time_utc: ["2025-08-25T00:00:00Z", "2025-08-25T01:30:00Z"],
+      speed_kmh: [50, 50],
+      soc: [0.3, 0.15],
+    } as PlanResponse;
+
+    const [finish] = compareStops(plan, after);
+    expect(finish).toMatchObject({ name: "End (Park)", km: 200, soc: { before: 0.3, after: 0.15 }, speedKmh: { before: 100, after: 50 } });
+    expect(finish.arrival.after.getTime() - finish.arrival.before.getTime()).toBe(3_600_000);
+    expect(lowestSocFrom(plan, 150)).toBe(0.3);
+    expect(lowestSocFrom(after, 150)).toBe(0.15);
   });
 
   it("writes the time zone out and shows clock times in it", () => {

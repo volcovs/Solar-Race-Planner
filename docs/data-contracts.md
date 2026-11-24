@@ -55,3 +55,15 @@ are ISO 8601 UTC strings.
 | `km` | number[] | Samples along the route |
 | `ghi_w_m2` | number[] | Global horizontal irradiance, W/m² |
 | `headwind_ms` | number[] | Wind along the route, m/s: + against the car, − behind it |
+
+## API: `POST /replan` (draft)
+
+The re-plan screen (FE-06) sends where the car is now; BE-05 answers with a new plan from
+there to the finish, in the `/plan` shape above. Its first stop is the re-plan point (`kind`
+`start`), followed by the stops still ahead. Mocked like the others until BE-05 exists.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `km` | number | The car's position, km from the start line |
+| `time_utc` | string | When it was there, ISO 8601 UTC (the page asks for local race time and converts) |
+| `soc` | number | Battery state of charge then, 0–1 |
