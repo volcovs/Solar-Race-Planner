@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Race strategy for solar cars from open satellite and weather data." />
     <title>Solar Race Planner</title>
+    <!-- Installable to a phone's home screen (FE-12): manifest, icons, and Safari's own tags. -->
+    <link rel="icon" href="%BASE_URL%icons/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="%BASE_URL%manifest.json" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Race Planner" />
+    <meta name="theme-color" content="#ffffff" />
     <script>
       // Apply the saved or system theme before the first paint, so the page never flashes.
       // Same storage key as src/lib/theme.ts.
@@ -12,6 +19,10 @@
         const saved = localStorage.getItem("srp-theme");
         const system = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         document.documentElement.dataset.theme = saved === "light" || saved === "dark" ? saved : system;
+        // Browser and status bar in the header's colour (--surface); src/lib/theme.ts keeps it in step.
+        if (document.documentElement.dataset.theme === "dark") {
+          document.querySelector('meta[name="theme-color"]').content = "#111827";
+        }
       } catch {
         document.documentElement.dataset.theme = "light";
       }

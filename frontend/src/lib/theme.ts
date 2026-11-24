@@ -14,6 +14,7 @@ export function currentTheme(): Theme {
 /** Apply and remember an explicit choice. Until the user chooses, the system setting wins. */
 export function setTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", readToken("--surface"));
   try {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {

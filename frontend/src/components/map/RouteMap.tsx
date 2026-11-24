@@ -1,10 +1,17 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import type { FeatureCollection } from "geojson"; // types that come with maplibre-gl
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type GeoJSONSource, type IControl } from "maplibre-gl";
+import {
+  Map as MapLibreMap,
+  NavigationControl,
+  setWorkerUrl,
+  type GeoJSONSource,
+  type IControl,
+  type MapMouseEvent,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { useEffect, useRef } from "react";
-import { bounds, kmAlong, pointAtKm } from "../../lib/geo";
+import { bounds, nearestKm, pointAtKm } from "../../lib/geo";
 import { placeName, type RouteData } from "../../lib/route";
 import { currentTheme, readToken, useTheme, type Theme } from "../../lib/theme";
 
@@ -66,17 +73,27 @@ export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Pr
       hoveredId = id;
       map.getCanvas().style.cursor = id === null ? "" : "pointer";
     };
-    map.on("mousemove", (e) => {
+    // The stretch under the pointer, and the km of the nearest point on the route.
+    const routeAt = (e: MapMouseEvent) => {
       const id = segmentAt(map, e.point.x, e.point.y);
+      const { route } = latest.current;
+      return { id, km: id === null ? null : nearestKm(route.line, route.cumKm, [e.lngLat.lng, e.lngLat.lat]).km };
+    };
+    map.on("mousemove", (e) => {
+      const { id, km } = routeAt(e);
       setHover(id);
-      const segment = id === null ? undefined : latest.current.route.segments[id];
-      latest.current.onCursor(segment ? kmAlong(segment, [e.lngLat.lng, e.lngLat.lat]) : null);
+      latest.current.onCursor(km);
     });
     map.on("mouseout", () => {
       setHover(null);
       latest.current.onCursor(null);
     });
-    map.on("click", (e) => latest.current.onSelect(segmentAt(map, e.point.x, e.point.y)));
+    // Phones have no hover: a tap both selects the stretch and shows the values there.
+    map.on("click", (e) => {
+      const { id, km } = routeAt(e);
+      latest.current.onSelect(id);
+      latest.current.onCursor(km);
+    });
 
     mapRef.current = map;
     return () => {

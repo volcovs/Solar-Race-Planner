@@ -52,6 +52,41 @@ Or everything at once (API, web app, PostGIS):
 docker compose up --build
 ```
 
+## On a phone
+
+The web app installs to a phone's home screen and opens full screen like an app; there is
+nothing to download. Open the deployed (HTTPS) address, then:
+
+- Android, Chrome: menu ⋮ → **Add to Home screen** (or **Install app**).
+- iPhone, Safari: **Share → Add to Home Screen**. The app shows this tip on iPhones.
+
+"Use my location" on Re-plan and installing both need HTTPS: they work on the deployed
+address and on `localhost`, not on a laptop's address over local Wi-Fi. The icons are drawn
+from `frontend/public/icons/icon.svg`.
+
+## Release
+
+Merging to `main` deploys (see `docs/deployment.md`). A release gives that version a
+number and notes on GitHub:
+
+1. In a pull request, set the same new version in `pyproject.toml` and the frontend, then merge it:
+
+   ```bash
+   cd frontend && npm version 0.2.0 --no-git-tag-version   # package.json and its lock file
+   ```
+
+2. Tag the merged commit on `main` and push the tag:
+
+   ```bash
+   git switch main && git pull
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+The Release workflow checks that the tag is on `main` and matches both versions, runs the tests,
+and publishes the release with notes from the pull requests merged since the last one. A tag
+such as `v0.2.0-rc.1` makes a pre-release. After changing the version, rerun
+`pip install -e ".[dev,geo]"` so a local API reports it too.
+
 ## Documents
 
 | File | What |

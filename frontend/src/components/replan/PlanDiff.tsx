@@ -40,9 +40,10 @@ export function PlanDiff({ before, after }: { before: PlanResponse; after: PlanR
         </Headline>
       </dl>
 
-      <div className="mt-6 overflow-x-auto rounded-card border border-line bg-surface">
-        <table className="w-full text-left">
-          <thead className="border-b border-line text-sm text-ink-muted">
+      {/* On phones each row folds into a block (stop on top, its numbers below, labelled), as on the Plan page. */}
+      <div className="mt-6 rounded-card border border-line bg-surface">
+        <table className="w-full text-left max-sm:block">
+          <thead className="border-b border-line text-sm text-ink-muted max-sm:hidden">
             <tr>
               <th scope="col" className="px-4 py-3 font-medium md:px-5">Stop</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Arrive</th>
@@ -50,27 +51,28 @@ export function PlanDiff({ before, after }: { before: PlanResponse; after: PlanR
               <th scope="col" className="px-4 py-3 text-right font-medium md:px-5">Speed there</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line tabular-nums">
+          <tbody className="divide-y divide-line tabular-nums max-sm:block">
             {compareStops(before, after).map((c) => (
-              <tr key={c.km}>
-                <th scope="row" className="px-4 py-3 font-display text-xl font-semibold md:px-5">
+              <tr key={c.km} className="max-sm:grid max-sm:grid-cols-3 max-sm:px-4 max-sm:py-3">
+                <th scope="row" className="px-4 py-3 font-display text-xl font-semibold max-sm:col-span-3 max-sm:p-0 md:px-5">
                   {placeName(c.name)}
                   <span className="block font-sans text-sm font-normal text-ink-muted">km {whole.format(c.km)}</span>
                 </th>
                 <Cell
+                  label={`Arrive, day ${dayAt(after, c.km)}`}
                   value={
                     <>
-                      <span className="text-base font-normal text-ink-muted">Day {dayAt(after, c.km)}</span>{" "}
+                      <span className="text-base font-normal text-ink-muted max-sm:hidden">Day {dayAt(after, c.km)}</span>{" "}
                       {clock.format(c.arrival.after)}
                     </>
                   }
                 >
                   <Delta change={minutes(c.arrival.before, c.arrival.after)} format={duration} worse="up" />
                 </Cell>
-                <Cell value={pct(c.soc.after)} risk={c.soc.after < after.min_soc}>
+                <Cell label="Battery" value={pct(c.soc.after)} risk={c.soc.after < after.min_soc}>
                   <Delta change={points(c.soc.before, c.soc.after)} format={pts} worse="down" />
                 </Cell>
-                <Cell value={`${whole.format(c.speedKmh.after)} km/h`}>
+                <Cell label="Speed there" value={`${whole.format(c.speedKmh.after)} km/h`}>
                   <Delta change={c.speedKmh.after - c.speedKmh.before} format={(n) => `${n} km/h`} />
                 </Cell>
               </tr>
@@ -94,9 +96,11 @@ function Headline({ label, value, was, risk = false, children }: { label: string
   );
 }
 
-function Cell({ value, risk = false, children }: { value: ReactNode; risk?: boolean; children: ReactNode }) {
+/** A number with its change under it; on phones it carries its own label, as the header row is hidden there. */
+function Cell({ label, value, risk = false, children }: { label: string; value: ReactNode; risk?: boolean; children: ReactNode }) {
   return (
-    <td className="px-4 py-3 text-right whitespace-nowrap last:md:pr-5">
+    <td className="px-4 py-3 text-right whitespace-nowrap last:md:pr-5 max-sm:px-0 max-sm:pt-2 max-sm:pb-0 max-sm:text-left">
+      <span className="block text-xs font-normal text-ink-muted sm:hidden">{label}</span>
       <span className={`block text-2xl font-semibold ${risk ? "text-risk" : ""}`}>{value}</span>
       <span className="text-sm">{children}</span>
     </td>

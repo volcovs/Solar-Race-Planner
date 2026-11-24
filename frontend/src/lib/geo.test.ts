@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bounds, cumulativeKm, distanceKm, kmAlong, pointAtKm, sliceByKm, type LonLat } from "./geo";
+import { bounds, cumulativeKm, distanceKm, nearestKm, pointAtKm, sliceByKm, type LonLat } from "./geo";
 
 // Along the equator one degree of longitude is 2πR/360 ≈ 111.195 km.
 const DEGREE_KM = distanceKm([0, 0], [1, 0]);
@@ -68,16 +68,17 @@ it("bounds are [[west, south], [east, north]]", () => {
   ]);
 });
 
-describe("kmAlong", () => {
-  const piece = { kmStart: 100, kmEnd: 120, coords: [[0, 0], [0.1, 0], [0.1, 0.1]] as LonLat[] };
+describe("nearestKm", () => {
+  const cum = cumulativeKm(LINE);
 
-  it("maps a point near the piece to its km, by share of the piece's length", () => {
-    expect(kmAlong(piece, [0.05, 0.001])).toBeCloseTo(105, 1); // a quarter of the way
-    expect(kmAlong(piece, [0.101, 0.05])).toBeCloseTo(115, 1); // three quarters, on the second leg
+  it("finds the km of the nearest point on the line, and how far off it the point is", () => {
+    const { km, offKm } = nearestKm(LINE, cum, [1.5, 0.01]);
+    expect(km).toBeCloseTo(1.5 * DEGREE_KM, 6);
+    expect(offKm).toBeCloseTo(0.01 * DEGREE_KM, 3);
   });
 
-  it("clamps points beyond the ends", () => {
-    expect(kmAlong(piece, [-1, 0])).toBe(100);
-    expect(kmAlong(piece, [0.1, 1])).toBe(120);
+  it("clamps to the ends", () => {
+    expect(nearestKm(LINE, cum, [-1, 0]).km).toBe(0);
+    expect(nearestKm(LINE, cum, [9, 0]).km).toBeCloseTo(3 * DEGREE_KM, 6);
   });
 });

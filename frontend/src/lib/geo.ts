@@ -60,24 +60,27 @@ export function sliceByKm(line: LonLat[], cum: number[], stepKm: number): Piece[
   return pieces;
 }
 
-/** km of the point on `piece` nearest to the point (flat-earth: a piece is only a few km long). */
-export function kmAlong(piece: Piece, [lon, lat]: LonLat): number {
+/**
+ * The km of the point on the line nearest to `p`, and how far `p` is from it. Flat-earth around
+ * `p`, which is exact enough within a few km of the route. `cum` comes from cumulativeKm(line).
+ */
+export function nearestKm(line: LonLat[], cum: number[], [lon, lat]: LonLat): { km: number; offKm: number } {
+  const kmPerDeg = (Math.PI / 180) * EARTH_RADIUS_KM;
   const cosLat = Math.cos(toRad(lat));
-  let best = { gap: Infinity, along: 0 };
-  let walked = 0;
-  for (let i = 1; i < piece.coords.length; i++) {
-    const [ax, ay] = piece.coords[i - 1];
-    const [bx, by] = piece.coords[i];
+  let best = { km: 0, offKm: Infinity };
+  for (let i = 1; i < line.length; i++) {
+    const [ax, ay] = line[i - 1];
+    const [bx, by] = line[i];
     const dx = (bx - ax) * cosLat;
     const dy = by - ay;
-    const length = Math.hypot(dx, dy);
-    const t = length === 0 ? 0 : Math.max(0, Math.min(1, (((lon - ax) * cosLat) * dx + (lat - ay) * dy) / length ** 2));
-    const gap = Math.hypot((lon - ax) * cosLat - t * dx, lat - ay - t * dy);
-    if (gap < best.gap) best = { gap, along: walked + t * length };
-    walked += length;
+    const px = (lon - ax) * cosLat;
+    const py = lat - ay;
+    const lengthSq = dx * dx + dy * dy;
+    const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, (px * dx + py * dy) / lengthSq));
+    const offKm = Math.hypot(px - t * dx, py - t * dy) * kmPerDeg;
+    if (offKm < best.offKm) best = { km: cum[i - 1] + t * (cum[i] - cum[i - 1]), offKm };
   }
-  const share = walked === 0 ? 0 : best.along / walked;
-  return piece.kmStart + share * (piece.kmEnd - piece.kmStart);
+  return best;
 }
 
 /** [[west, south], [east, north]] of the line. */

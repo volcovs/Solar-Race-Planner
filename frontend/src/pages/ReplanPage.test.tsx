@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routes } from "../app/routes";
@@ -15,7 +15,30 @@ beforeEach(() => {
     ),
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete (navigator as { geolocation?: unknown }).geolocation;
+});
+
+/** The phone's GPS reports `lonLat` (or fails with `errorCode`). jsdom has none, so add it. */
+function stubGps(result: { lonLat: [number, number] } | { errorCode: number }) {
+  vi.stubGlobal("isSecureContext", true);
+  Object.defineProperty(navigator, "geolocation", {
+    configurable: true,
+    value: {
+      getCurrentPosition: (ok: PositionCallback, fail: PositionErrorCallback) =>
+        "lonLat" in result
+          ? ok({ coords: { longitude: result.lonLat[0], latitude: result.lonLat[1] } } as GeolocationPosition)
+          : fail({ code: result.errorCode, message: "" } as GeolocationPositionError),
+    },
+  });
+}
+
+async function useMyLocation() {
+  const button = screen.getByRole("button", { name: "Use my location" });
+  await waitFor(() => expect(button).toBeEnabled()); // once the route has loaded
+  fireEvent.click(button);
+}
 
 async function openReplan() {
   render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/replan"] })} />);
@@ -56,5 +79,32 @@ describe("ReplanPage", () => {
     expect(within(diff).getByText("Arrive End")).toBeInTheDocument();
     const rows = within(within(diff).getByRole("table")).getAllByRole("rowheader");
     expect(rows.map((r) => r.textContent)).toEqual(["Middlekm 150", "Endkm 334"]);
+  });
+
+  describe("Use my location", () => {
+    it("fills the km from the phone's position, snapped to the route", async () => {
+      stubGps({ lonLat: [1, 0.001] }); // beside the fixture route, one degree (~111 km) from the start
+      await openReplan();
+      await useMyLocation();
+
+      expect(screen.getByLabelText("Position, km")).toHaveValue(111.2);
+      expect(screen.getByText("From your location, 0.1 km off the route.")).toBeInTheDocument();
+    });
+
+    it("warns when the phone is far from the route", async () => {
+      stubGps({ lonLat: [1, 0.5] }); // ~56 km north of it
+      await openReplan();
+      await useMyLocation();
+
+      expect(screen.getByText(/You're 55\.\d km from the route/)).toBeInTheDocument();
+    });
+
+    it("says so when location is refused", async () => {
+      stubGps({ errorCode: 1 });
+      await openReplan();
+      await useMyLocation();
+
+      expect(screen.getByText(/Location access is off for this site/)).toBeInTheDocument();
+    });
   });
 });

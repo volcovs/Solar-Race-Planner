@@ -80,6 +80,9 @@
 @layer base {
   body {
     @apply bg-ground font-sans text-ink antialiased;
+    /* Clear of the notch when a phone is on its side (viewport-fit=cover in index.html). */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   :focus-visible {
@@ -88,6 +91,14 @@
 }
 
 /* MapLibre's own controls (zoom, attribution) in our tokens, so they follow the theme. */
+@media (pointer: coarse) {
+  /* Finger-sized: MapLibre's buttons are 29 px, under the 44 px minimum for touch.
+     Scoped under .maplibregl-map to outrank MapLibre's own rule, which loads after ours. */
+  .maplibregl-map .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+}
 .maplibregl-ctrl-group {
   background: var(--surface);
   border-radius: var(--radius-control);

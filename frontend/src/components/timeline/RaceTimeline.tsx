@@ -226,7 +226,7 @@ function buildOption(
     grid,
     xAxis,
     yAxis,
-    axisPointer: { link: [{ xAxisIndex: "all" }], triggerOn: "mousemove" },
+    axisPointer: { link: [{ xAxisIndex: "all" }], triggerOn: "mousemove|click" }, // click: a tap on a phone
     series: [
       // The P10–P90 band: an invisible floor at P10 with the band's width stacked on top.
       line(0, along(plan.km, plan.soc_p10, 100), "transparent", { stack: "band", ...markers(true) }),

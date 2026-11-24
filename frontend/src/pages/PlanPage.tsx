@@ -5,11 +5,13 @@ import { DayCards } from "../components/plan/DayCards";
 import { StageTable } from "../components/plan/StageTable";
 import { getPlan } from "../lib/api";
 import { zoneLabel, type PlanResponse } from "../lib/plan";
+import { useWakeLock } from "../lib/useWakeLock";
 
 type Load = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; plan: PlanResponse };
 
 /** The plan in big numbers for the chase car: day by day, then stop by stop. */
 export function PlanPage() {
+  useWakeLock(); // read in the chase car: keep the screen on
   const [load, setLoad] = useState<Load>({ status: "loading" });
 
   useEffect(() => {
