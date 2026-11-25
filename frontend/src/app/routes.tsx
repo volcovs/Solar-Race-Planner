@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import type { RouteObject } from "react-router";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PlanPage } from "../pages/PlanPage";
+import { ReplanPage } from "../pages/ReplanPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { AppLayout } from "./AppLayout";
 import { SECTIONS } from "./navigation";
@@ -12,6 +13,7 @@ const MapPage = lazy(() => import("../pages/MapPage").then((m) => ({ default: m.
 /** Sections whose real page exists; the others show a placeholder. */
 const PAGES: Record<string, ReactNode> = {
   "/plan": <PlanPage />,
+  "/replan": <ReplanPage />,
   "/map": (
     <Suspense fallback={<div className="flex-1 bg-surface-muted" />}>
       <MapPage />

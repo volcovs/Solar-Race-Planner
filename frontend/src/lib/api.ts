@@ -1,10 +1,10 @@
-import type { ForecastResponse, PlanResponse } from "./plan";
+import type { ForecastResponse, PlanResponse, ReplanRequest } from "./plan";
 
 // Deployed builds set VITE_API_URL to the API URL; in dev, /api is proxied to localhost:8000.
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
-// The API has no /plan or /forecast yet (BE-04): until it does, they come from src/mocks.
-// Build with VITE_API_MOCK=false to call the real ones.
+// The API has no /plan, /forecast or /replan yet (BE-04, BE-05): until it does, they come from
+// src/mocks. Build with VITE_API_MOCK=false to call the real ones.
 const MOCK_API = import.meta.env.VITE_API_MOCK !== "false";
 
 export interface Health {
@@ -31,3 +31,15 @@ export const getPlan = (signal?: AbortSignal) =>
 
 export const getForecast = (signal?: AbortSignal) =>
   MOCK_API ? getMock<ForecastResponse>("/forecast") : getJson<ForecastResponse>("/forecast", signal);
+
+/** A new plan from where the car is now. */
+export async function replan(request: ReplanRequest): Promise<PlanResponse> {
+  if (MOCK_API) return (await import("../mocks/api")).mockReplan(request);
+  const res = await fetch(`${BASE}/replan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) throw new Error(`/replan: ${res.status}`);
+  return res.json() as Promise<PlanResponse>;
+}

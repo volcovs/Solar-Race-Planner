@@ -17,6 +17,13 @@ export interface PlanResponse {
   soc_p90: number[]; // optimistic SoC (P90)
 }
 
+/** POST /replan: where the car is now. The answer is a PlanResponse from there to the finish. */
+export interface ReplanRequest {
+  km: number;
+  time_utc: string; // ISO 8601
+  soc: number; // 0–1
+}
+
 /** GET /forecast: the weather along the route at the planned arrival times (WX-06). */
 export interface ForecastResponse {
   model: string;
@@ -73,13 +80,31 @@ export function raceClock(plan: PlanResponse): Intl.DateTimeFormat {
   return new Intl.DateTimeFormat("en-GB", { timeZone: plan.timezone, hour: "2-digit", minute: "2-digit" });
 }
 
+/** The zone's offset from UTC at instant `t`, in minutes (570 for UTC+9:30). */
+function utcOffsetMinutes(timezone: string, t: number): number {
+  const name = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, timeZoneName: "shortOffset" })
+    .formatToParts(t)
+    .find((p) => p.type === "timeZoneName")?.value;
+  const [, sign, hours, minutes = "0"] = name?.match(/GMT([+-])(\d+)(?::(\d+))?/) ?? [];
+  return sign ? (sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes)) : 0;
+}
+
 /** The race's zone as people read it, e.g. "Australia/Darwin (UTC+9:30)". */
 export function zoneLabel(plan: PlanResponse): string {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: plan.timezone, timeZoneName: "shortOffset" }).formatToParts(
-    new Date(plan.time_utc[0]),
-  );
-  const offset = parts.find((p) => p.type === "timeZoneName")?.value.replace("GMT", "UTC") ?? "";
-  return `${plan.timezone.replace(/_/g, " ")} (${offset === "UTC" ? "UTC+0" : offset})`;
+  const offset = utcOffsetMinutes(plan.timezone, Date.parse(plan.time_utc[0]));
+  const hours = Math.trunc(Math.abs(offset) / 60);
+  const minutes = Math.abs(offset) % 60;
+  const sign = offset < 0 ? "-" : "+";
+  return `${plan.timezone.replace(/_/g, " ")} (UTC${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""})`;
+}
+
+/** The instant of a local race clock time ("14:05") on race day `day`; day 1 is the plan's first. */
+export function raceTimeToUtc(plan: PlanResponse, day: number, clock: string): Date {
+  const first = Date.parse(plan.time_utc[0]);
+  const local = new Date(first + utcOffsetMinutes(plan.timezone, first) * 60_000);
+  const [hours, minutes] = clock.split(":").map(Number);
+  const wall = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + day - 1, hours, minutes);
+  return new Date(wall - utcOffsetMinutes(plan.timezone, wall) * 60_000);
 }
 
 export interface Stage {
@@ -142,4 +167,33 @@ export function daySummaries(plan: PlanResponse): DaySummary[] {
     });
     return { day: d.day, endKm: d.end_km, endTime: timeAt(plan, d.end_km), minSoc, minP10, safe: minP10 >= plan.min_soc };
   });
+}
+
+export interface Change<T> {
+  before: T;
+  after: T;
+}
+
+export interface StopChange {
+  name: string;
+  km: number;
+  arrival: Change<Date>;
+  soc: Change<number>; // on arrival
+  speedKmh: Change<number>; // average on the way there, from the previous stop (or the re-plan point)
+}
+
+/** Stop by stop ahead of a re-plan: what the previous plan said and what the new one says. */
+export function compareStops(before: PlanResponse, after: PlanResponse): StopChange[] {
+  return stages(after).map((s) => ({
+    name: s.to,
+    km: s.toKm,
+    arrival: { before: timeAt(before, s.toKm), after: s.arrival },
+    soc: { before: valueAt(before.km, before.soc, s.toKm), after: s.arrivalSoc },
+    speedKmh: { before: averageSpeed(before, s.fromKm, s.toKm), after: s.speedKmh },
+  }));
+}
+
+/** The lowest planned battery from `km` to the finish. */
+export function lowestSocFrom(plan: PlanResponse, km: number): number {
+  return Math.min(...plan.soc.filter((_, i) => plan.km[i] >= km));
 }
