@@ -1,9 +1,10 @@
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
-import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type IControl } from "maplibre-gl";
+import type { FeatureCollection } from "geojson"; // types that come with maplibre-gl
+import { Map as MapLibreMap, NavigationControl, setWorkerUrl, type GeoJSONSource, type IControl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { useEffect, useRef } from "react";
-import { bounds } from "../../lib/geo";
+import { bounds, kmAlong, pointAtKm } from "../../lib/geo";
 import { placeName, type RouteData } from "../../lib/route";
 import { currentTheme, readToken, useTheme, type Theme } from "../../lib/theme";
 
@@ -21,6 +22,7 @@ const LABEL_FONT = ["Noto Sans Regular"]; // available in both base map styles
 
 const SEGMENTS = "segments";
 const STOPS = "stops";
+const CURSOR = "cursor";
 const ROUTE_LINE = "route-line";
 const TAP_TOLERANCE_PX = 10; // the route line is thin; accept taps near it
 
@@ -28,16 +30,18 @@ interface Props {
   route: RouteData;
   selectedId: number | null;
   onSelect: (segmentId: number | null) => void;
+  cursorKm: number | null; // shared with the timeline: drawn as a dot on the route
+  onCursor: (km: number | null) => void;
 }
 
 /** MapLibre map of the route and its stops; a stretch of road can be hovered and selected. */
-export function RouteMap({ route, selectedId, onSelect }: Props) {
+export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const theme = useTheme();
   // The style.load handler re-adds layers after every style change and needs the latest props.
-  const latest = useRef({ route, selectedId, onSelect });
-  latest.current = { route, selectedId, onSelect };
+  const latest = useRef({ route, selectedId, onSelect, cursorKm, onCursor });
+  latest.current = { route, selectedId, onSelect, cursorKm, onCursor };
 
   // Create the map once.
   useEffect(() => {
@@ -62,8 +66,16 @@ export function RouteMap({ route, selectedId, onSelect }: Props) {
       hoveredId = id;
       map.getCanvas().style.cursor = id === null ? "" : "pointer";
     };
-    map.on("mousemove", (e) => setHover(segmentAt(map, e.point.x, e.point.y)));
-    map.on("mouseout", () => setHover(null));
+    map.on("mousemove", (e) => {
+      const id = segmentAt(map, e.point.x, e.point.y);
+      setHover(id);
+      const segment = id === null ? undefined : latest.current.route.segments[id];
+      latest.current.onCursor(segment ? kmAlong(segment, [e.lngLat.lng, e.lngLat.lat]) : null);
+    });
+    map.on("mouseout", () => {
+      setHover(null);
+      latest.current.onCursor(null);
+    });
     map.on("click", (e) => latest.current.onSelect(segmentAt(map, e.point.x, e.point.y)));
 
     mapRef.current = map;
@@ -90,7 +102,17 @@ export function RouteMap({ route, selectedId, onSelect }: Props) {
     }
     if (selectedId !== null) map.setFeatureState({ source: SEGMENTS, id: selectedId }, { selected: true });
     shownSelection.current = selectedId;
-  }, [selectedId]);
+
+    // Picked from the timeline, the stretch may be off screen: bring it into view.
+    const segment = selectedId === null ? undefined : route.segments[selectedId];
+    const middle = segment?.coords[Math.floor(segment.coords.length / 2)];
+    if (middle && !map.getBounds().contains(middle)) map.easeTo({ center: middle });
+  }, [selectedId, route]);
+
+  useEffect(() => {
+    const source = mapRef.current?.getSource<GeoJSONSource>(CURSOR);
+    source?.setData(cursorFeatures(route, cursorKm));
+  }, [route, cursorKm]);
 
   // MapLibre's CSS makes its element `position: relative`, so the wrapper does the positioning.
   return (
@@ -100,7 +122,10 @@ export function RouteMap({ route, selectedId, onSelect }: Props) {
   );
 }
 
-function addRouteLayers(map: MapLibreMap, { route, selectedId }: { route: RouteData; selectedId: number | null }) {
+function addRouteLayers(
+  map: MapLibreMap,
+  { route, selectedId, cursorKm }: { route: RouteData; selectedId: number | null; cursorKm: number | null },
+) {
   map.addSource(SEGMENTS, {
     type: "geojson",
     attribution: ROUTE_CREDIT,
@@ -167,7 +192,31 @@ function addRouteLayers(map: MapLibreMap, { route, selectedId }: { route: RouteD
     paint: { "text-color": readToken("--ink"), "text-halo-color": readToken("--surface"), "text-halo-width": 1.5 },
   });
 
+  map.addSource(CURSOR, { type: "geojson", data: cursorFeatures(route, cursorKm) });
+  map.addLayer({
+    id: "cursor",
+    type: "circle",
+    source: CURSOR,
+    paint: {
+      "circle-radius": 6,
+      "circle-color": readToken("--battery"),
+      "circle-stroke-color": readToken("--surface"),
+      "circle-stroke-width": 2,
+    },
+  });
+
   if (selectedId !== null) map.setFeatureState({ source: SEGMENTS, id: selectedId }, { selected: true });
+}
+
+/** The cursor as a point on the route, or nothing. */
+function cursorFeatures(route: RouteData, km: number | null): FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features:
+      km === null
+        ? []
+        : [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: pointAtKm(route.line, route.cumKm, km) } }],
+  };
 }
 
 /** Width by zoom, thicker for the hovered and selected stretch. `extra` widens the casing. */
@@ -184,6 +233,7 @@ function lineWidth(extra: number): ExpressionSpecification {
 }
 
 function segmentAt(map: MapLibreMap, x: number, y: number): number | null {
+  if (!map.getLayer(ROUTE_LINE)) return null; // between a theme's new style and its style.load
   const t = TAP_TOLERANCE_PX;
   const [hit] = map.queryRenderedFeatures(
     [

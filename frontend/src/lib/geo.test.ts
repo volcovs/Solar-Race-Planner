@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bounds, cumulativeKm, distanceKm, pointAtKm, sliceByKm, type LonLat } from "./geo";
+import { bounds, cumulativeKm, distanceKm, kmAlong, pointAtKm, sliceByKm, type LonLat } from "./geo";
 
 // Along the equator one degree of longitude is 2πR/360 ≈ 111.195 km.
 const DEGREE_KM = distanceKm([0, 0], [1, 0]);
@@ -66,4 +66,18 @@ it("bounds are [[west, south], [east, north]]", () => {
     [130, -35],
     [138, -12],
   ]);
+});
+
+describe("kmAlong", () => {
+  const piece = { kmStart: 100, kmEnd: 120, coords: [[0, 0], [0.1, 0], [0.1, 0.1]] as LonLat[] };
+
+  it("maps a point near the piece to its km, by share of the piece's length", () => {
+    expect(kmAlong(piece, [0.05, 0.001])).toBeCloseTo(105, 1); // a quarter of the way
+    expect(kmAlong(piece, [0.101, 0.05])).toBeCloseTo(115, 1); // three quarters, on the second leg
+  });
+
+  it("clamps points beyond the ends", () => {
+    expect(kmAlong(piece, [-1, 0])).toBe(100);
+    expect(kmAlong(piece, [0.1, 1])).toBe(120);
+  });
 });

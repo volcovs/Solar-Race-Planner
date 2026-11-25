@@ -6,12 +6,14 @@ type Handler = (event?: unknown) => void;
 export class Map {
   static instances: Map[] = [];
   readonly handlers: Record<string, Handler[]> = {};
-  readonly sources = new Set<string>();
+  readonly sources = new globalThis.Map<string, { setData: ReturnType<typeof vi.fn> }>();
   readonly layers = new Set<string>();
   readonly controls: { onAdd: (map: Map) => HTMLElement }[] = [];
   setStyle = vi.fn();
   fitBounds = vi.fn();
   setFeatureState = vi.fn();
+  easeTo = vi.fn();
+  getBounds = vi.fn(() => ({ contains: () => true }));
   queryRenderedFeatures = vi.fn((): { id?: number }[] => []);
 
   constructor(readonly options: { style: string }) {
@@ -32,13 +34,13 @@ export class Map {
     return this;
   }
   addSource(id: string) {
-    this.sources.add(id);
+    this.sources.set(id, { setData: vi.fn() });
   }
   addLayer({ id }: { id: string }) {
     this.layers.add(id);
   }
   getSource(id: string) {
-    return this.sources.has(id) ? {} : undefined;
+    return this.sources.get(id);
   }
   getLayer(id: string) {
     return this.layers.has(id) ? {} : undefined;
