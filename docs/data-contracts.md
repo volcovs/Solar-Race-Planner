@@ -67,3 +67,37 @@ there to the finish, in the `/plan` shape above. Its first stop is the re-plan p
 | `km` | number | The car's position, km from the start line |
 | `time_utc` | string | When it was there, ISO 8601 UTC (the page asks for local race time and converts) |
 | `soc` | number | Battery state of charge then, 0–1 |
+## `data/forecasts/forecast.parquet` (v1)
+
+Multi-point weather forecast sampled along the route from the Open-Meteo Forecast API
+(SCRUM-28). Parquet, one row per `(point_id, time_utc)`. Produced by
+`OpenMeteoClient.fetch_forecast`, which returns this table as a DataFrame.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `point_id` | string | Identifier of the route sample point, as given by the caller (`str(RoutePoint.point_id)`) |
+| `time_utc` | timestamp (UTC) | Valid time of the forecast step |
+| `step_minutes` | int | Step / averaging length in minutes (`15` or `60`) |
+| `shortwave_radiation` | float | GHI, W/m² — **average over the preceding `step_minutes`**, not instantaneous |
+| `direct_normal_irradiance` | float | DNI, W/m² — **average over the preceding `step_minutes`**, not instantaneous |
+| `diffuse_radiation` | float | DHI, W/m² — **average over the preceding `step_minutes`**, not instantaneous |
+| `wind_speed_10m` | float | Wind speed at 10 m, **m/s** (always requested with `wind_speed_unit=ms`) |
+| `wind_direction_10m` | float | Wind direction at 10 m, degrees 0–360, direction the wind blows from |
+| `wind_gusts_10m` | float | Wind gusts at 10 m, **m/s** |
+| `temperature_2m` | float | Air temperature at 2 m, °C |
+| `cloud_cover` | float | Total cloud cover, % (0–100) |
+| `model` | string | Model **requested** (e.g. `best_match`), not necessarily the model actually used |
+| `issue_time_utc` | timestamp (UTC, unit `s`) | When this batch was **fetched** (cache time for cached batches), not the model run time |
+| `request_url` | string | Full Open-Meteo request URL used to produce the row |
+
+**Notes:**
+- **Irradiance averaging:** values are means over the **preceding** `step_minutes`
+  (e.g. `01:00` with `step_minutes=60` is the mean of `00:00–01:00`). Downstream solar
+  models (`pvlib`) must use `step_minutes` to apply the midpoint offset.
+- **15-minute availability:** native 15-minute data exists only for Europe and North America.
+  For Australia the 15-minute values are interpolated from the hourly forecast, so they add
+  request weight without new information. The client defaults to `hourly`.
+- **Caching:** raw JSON per batch is cached under `data/forecasts/raw/` (key: request URL hash),
+  default TTL 30 min (`cache_ttl_seconds=1800`). Use `use_cache=False` or delete the folder
+  to force a fresh fetch.
+
