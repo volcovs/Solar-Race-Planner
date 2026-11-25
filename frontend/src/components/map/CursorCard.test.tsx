@@ -8,6 +8,7 @@ const plan: PlanResponse = {
   created_at: "2025-08-23T12:00:00Z",
   timezone: "UTC",
   min_soc: 0.1,
+  stops: [],
   days: [{ day: 1, start_km: 0, end_km: 100 }],
   km: [0, 100],
   time_utc: ["2025-08-24T08:00:00Z", "2025-08-24T09:00:00Z"],

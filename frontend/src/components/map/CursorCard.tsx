@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { dayAt, timeAt, valueAt, type ForecastResponse, type PlanResponse } from "../../lib/plan";
+import { dayAt, raceClock, timeAt, valueAt, type ForecastResponse, type PlanResponse } from "../../lib/plan";
 import { nextStop, placeName, type Stop } from "../../lib/route";
 
 const whole = new Intl.NumberFormat("en", { maximumFractionDigits: 0 });
@@ -15,7 +15,7 @@ interface Props {
 
 /** The plan and weather at the cursor, from the full data: top right on the map, across its foot on phones. */
 export function CursorCard({ km, plan, forecast, stops }: Props) {
-  const clock = new Intl.DateTimeFormat("en-GB", { timeZone: plan.timezone, hour: "2-digit", minute: "2-digit" });
+  const clock = raceClock(plan);
   const wind = valueAt(forecast.km, forecast.headwind_ms, km);
   const ahead = nextStop(stops, km);
   const p10 = valueAt(plan.km, plan.soc_p10, km);

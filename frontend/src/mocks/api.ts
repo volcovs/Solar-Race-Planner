@@ -1,9 +1,9 @@
-// Made-up /plan and /forecast responses until the API serves them (BE-04), in the shapes of
-// src/lib/plan.ts: a crude drive along the sample route with made-up clouds and wind.
+// Made-up /plan, /forecast and /replan responses until the API serves them (BE-04, BE-05), in
+// the shapes of src/lib/plan.ts: a crude drive along the sample route with made-up clouds and wind.
 // The car charges only from its own array, so at stops only while the sun is up.
 
 import { pointAtKm } from "../lib/geo";
-import type { ForecastResponse, PlanResponse } from "../lib/plan";
+import type { ForecastResponse, PlanResponse, ReplanRequest } from "../lib/plan";
 import { loadRoute, type RouteData } from "../lib/route";
 
 const ROUTE_URL = `${import.meta.env.BASE_URL}sample/route.geojson`;
@@ -26,13 +26,25 @@ export function mockResponse(path: "/plan" | "/forecast"): Promise<PlanResponse 
 }
 let cached: Promise<{ plan: PlanResponse; forecast: ForecastResponse }> | undefined;
 
-/** Drive the route in STEP_KM steps and record what a plan and a forecast would say. */
-export function simulate(route: RouteData) {
+/** The same drive from where the car is now. /plan stays the original, so there's something to compare with. */
+export function mockReplan(request: ReplanRequest): Promise<PlanResponse> {
+  return loadRoute(ROUTE_URL).then((route) => simulate(route, request).plan);
+}
+
+const RACE_START: ReplanRequest = { km: 0, time_utc: new Date(START_UTC).toISOString(), soc: 1 };
+
+/** Drive the route in STEP_KM steps from `from` and record what a plan and a forecast would say. */
+export function simulate(route: RouteData, from: ReplanRequest = RACE_START) {
+  const startT = Date.parse(from.time_utc);
   const plan: PlanResponse = {
     plan_id: "sample",
-    created_at: new Date(START_UTC - 12 * HOUR_MS).toISOString(),
+    created_at: new Date(from === RACE_START ? START_UTC - 12 * HOUR_MS : startT).toISOString(),
     timezone: TIMEZONE,
     min_soc: 0.1,
+    stops: [
+      from.km === 0 ? route.stops[0] : { kind: "start" as const, name: "Re-plan point", km: from.km },
+      ...route.stops.filter((s) => s.km > from.km),
+    ].map(({ kind, name, km }) => ({ kind, name, km })),
     days: [],
     km: [],
     time_utc: [],
@@ -43,28 +55,34 @@ export function simulate(route: RouteData) {
   };
   const forecast: ForecastResponse = { model: "sample", issue_time_utc: plan.created_at, km: [], ghi_w_m2: [], headwind_ms: [] };
 
-  const stopsAhead = route.stops.filter((s) => s.kind === "control_stop").map((s) => s.km);
-  let t = START_UTC;
-  let soc = 1;
-  let day = { day: 1, start_km: 0 };
+  const stopsAhead = route.stops.filter((s) => s.kind === "control_stop" && s.km > from.km).map((s) => s.km);
+  let t = startT;
+  let departAt = drivingTime(t); // later than `t` when the car stops at this km
+  let soc = from.soc;
+  let day = { day: raceDay(departAt), start_km: from.km };
+  const share = (km: number) => (km - from.km) / (route.lengthKm - from.km); // of the distance left
 
-  for (let km = 0; ; km = Math.min(km + STEP_KM, route.lengthKm)) {
+  for (let km = from.km; ; km = Math.min(km + STEP_KM, route.lengthKm)) {
     const [lon, lat] = pointAtKm(route.line, route.cumKm, km);
+    const arrival = { t, soc, ghi: irradiance(lat, lon, t, km) };
+    soc = charge(soc, parkedWh(lat, lon, t, departAt, km));
+    t = departAt;
+
     const ghi = irradiance(lat, lon, t, km);
     const headwind = 3 * Math.sin(km / 180) + 2 * Math.sin(km / 53 + 2);
-    // Slow down when the battery is under a straight line from full to 15% at the finish.
-    const target = 1 - 0.85 * (km / route.lengthKm);
+    // Slow down when the battery is under a straight line from where it started to 25% at the finish.
+    const target = from.soc - (from.soc - 0.25) * share(km);
     const speed = clamp(80 + 300 * (soc - target), 40, 110);
-    const spread = 0.02 + 0.1 * (km / route.lengthKm);
+    const spread = 0.02 + 0.1 * share(km);
 
     plan.km.push(km);
-    plan.time_utc.push(new Date(t).toISOString());
+    plan.time_utc.push(new Date(arrival.t).toISOString());
     plan.speed_kmh.push(speed);
-    plan.soc.push(soc);
-    plan.soc_p10.push(clamp(soc - spread, 0, 1));
-    plan.soc_p90.push(clamp(soc + spread, 0, 1));
+    plan.soc.push(arrival.soc);
+    plan.soc_p10.push(clamp(arrival.soc - spread, 0, 1));
+    plan.soc_p90.push(clamp(arrival.soc + spread, 0, 1));
     forecast.km.push(km);
-    forecast.ghi_w_m2.push(ghi);
+    forecast.ghi_w_m2.push(arrival.ghi);
     forecast.headwind_ms.push(headwind);
     if (km >= route.lengthKm) break;
 
@@ -72,18 +90,16 @@ export function simulate(route: RouteData) {
     soc = charge(soc, (solarW(ghi) - drivingW(speed / 3.6, headwind)) * hours);
     t += hours * HOUR_MS;
 
-    let stopUntil = t;
+    departAt = t;
     if (stopsAhead.length > 0 && km + STEP_KM >= stopsAhead[0]) {
       stopsAhead.shift();
-      stopUntil = t + CONTROL_STOP_H * HOUR_MS;
+      departAt += CONTROL_STOP_H * HOUR_MS;
     }
-    if (localHour(stopUntil) >= DRIVE_UNTIL_H) {
+    if (localHour(departAt) >= DRIVE_UNTIL_H) {
       plan.days.push({ ...day, end_km: km + STEP_KM });
       day = { day: day.day + 1, start_km: km + STEP_KM };
-      stopUntil = nextMorning(stopUntil);
+      departAt = nextMorning(departAt);
     }
-    soc = charge(soc, parkedWh(lat, lon, t, stopUntil, km));
-    t = stopUntil;
   }
   plan.days.push({ ...day, end_km: route.lengthKm });
   return { plan, forecast };
@@ -122,6 +138,19 @@ function irradiance(lat: number, lon: number, t: number, km: number): number {
 }
 
 const localHour = (t: number) => (t / HOUR_MS + UTC_OFFSET_H) % 24;
+
+/** `t`, or the next start of driving hours if it's outside them. */
+function drivingTime(t: number): number {
+  const hour = localHour(t);
+  if (hour >= DRIVE_FROM_H && hour < DRIVE_UNTIL_H) return t;
+  return hour < DRIVE_FROM_H ? t + (DRIVE_FROM_H - hour) * HOUR_MS : nextMorning(t);
+}
+
+/** The race day of instant `t`: 1 on the start's local date. */
+const raceDay = (t: number) => {
+  const localDay = (u: number) => Math.floor((u / HOUR_MS + UTC_OFFSET_H) / 24);
+  return localDay(t) - localDay(START_UTC) + 1;
+};
 
 function nextMorning(t: number): number {
   const localMidnightH = Math.floor((t / HOUR_MS + UTC_OFFSET_H) / 24) * 24;
