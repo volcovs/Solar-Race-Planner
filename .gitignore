@@ -2,6 +2,9 @@
 .env
 *.key
 *service-account*.json
+secrets/
+*.json
+
 
 # Data: seeded by scripts, never committed
 data/*
