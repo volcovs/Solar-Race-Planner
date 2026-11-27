@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { averageSpeed, type Scenario } from "../lib/plan";
 import { buildRoute } from "../lib/route";
 import { ROUTE_FILE } from "../test/fixtures";
-import { simulate } from "./api";
+import { mockScenarios, simulate } from "./api";
 
 describe("mock /plan and /forecast", () => {
   const { plan, forecast } = simulate(buildRoute(ROUTE_FILE));
@@ -44,5 +45,27 @@ describe("mock /plan and /forecast", () => {
     expect(replan.soc[0]).toBe(0.5);
     expect(replan.time_utc[0]).toBe("2025-08-24T03:00:00.000Z");
     expect(replan.stops.map((s) => s.name)).toEqual(["Re-plan point", "Middle", "End (Park)"]);
+  });
+});
+
+describe("mock /scenarios", () => {
+  const base: Scenario = { start_soc: 1, weather_shift_h: 0, weather: "p50", cda_factor: 1, strategy: "planned" };
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("answers each scenario; constant speed holds the planned run's average", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ROUTE_FILE })));
+    const { plans } = await mockScenarios([base, { ...base, strategy: "constant" }, { ...base, start_soc: 0.5 }]);
+
+    expect(plans).toHaveLength(3);
+    expect(new Set(plans[1].speed_kmh).size).toBe(1);
+    expect(plans[1].speed_kmh[0]).toBeCloseTo(averageSpeed(plans[0]), 6);
+    expect(plans[2].soc[0]).toBe(0.5);
+  });
+
+  it("stops when cancelled", async () => {
+    const abort = new AbortController();
+    const running = mockScenarios([base], abort.signal);
+    abort.abort();
+    await expect(running).rejects.toMatchObject({ name: "AbortError" });
   });
 });

@@ -1,9 +1,9 @@
-import type { ForecastResponse, PlanResponse, ReplanRequest } from "./plan";
+import type { ForecastResponse, PlanResponse, ReplanRequest, Scenario } from "./plan";
 
 // Deployed builds set VITE_API_URL to the API URL; in dev, /api is proxied to localhost:8000.
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
-// The API has no /plan, /forecast or /replan yet (BE-04, BE-05): until it does, they come from
+// The API has no /plan, /forecast, /replan or /scenarios yet (BE-04, BE-05): until it does, they come from
 // src/mocks. Build with VITE_API_MOCK=false to call the real ones.
 const MOCK_API = import.meta.env.VITE_API_MOCK !== "false";
 
@@ -42,4 +42,17 @@ export async function replan(request: ReplanRequest): Promise<PlanResponse> {
   });
   if (!res.ok) throw new Error(`/replan: ${res.status}`);
   return res.json() as Promise<PlanResponse>;
+}
+
+/** One plan per scenario, in the same order. Abort `signal` to cancel. */
+export async function runScenarios(scenarios: Scenario[], signal?: AbortSignal): Promise<PlanResponse[]> {
+  if (MOCK_API) return (await (await import("../mocks/api")).mockScenarios(scenarios, signal)).plans;
+  const res = await fetch(`${BASE}/scenarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarios }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`/scenarios: ${res.status}`);
+  return ((await res.json()) as { plans: PlanResponse[] }).plans;
 }

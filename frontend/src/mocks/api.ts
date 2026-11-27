@@ -1,9 +1,9 @@
-// Made-up /plan, /forecast and /replan responses until the API serves them (BE-04, BE-05), in
+// Made-up /plan, /forecast, /replan and /scenarios responses until the API serves them (BE-04, BE-05), in
 // the shapes of src/lib/plan.ts: a crude drive along the sample route with made-up clouds and wind.
 // The car charges only from its own array, so at stops only while the sun is up.
 
 import { pointAtKm } from "../lib/geo";
-import type { ForecastResponse, PlanResponse, ReplanRequest } from "../lib/plan";
+import { averageSpeed, type ForecastResponse, type PlanResponse, type ReplanRequest, type Scenario } from "../lib/plan";
 import { loadRoute, type RouteData } from "../lib/route";
 
 const ROUTE_URL = `${import.meta.env.BASE_URL}sample/route.geojson`;
@@ -21,20 +21,74 @@ const CONTROL_STOP_H = 0.5;
 const CAR = { massKg: 250, cdaM2: 0.08, crr: 0.006, arrayM2: 4, arrayEff: 0.24, batteryWh: 3000, drivetrainEff: 0.95 };
 
 export function mockResponse(path: "/plan" | "/forecast"): Promise<PlanResponse | ForecastResponse> {
-  cached ??= loadRoute(ROUTE_URL).then(simulate);
+  cached ??= loadRoute(ROUTE_URL).then((route) => planRace(route));
   return cached.then((race) => (path === "/plan" ? race.plan : race.forecast));
 }
 let cached: Promise<{ plan: PlanResponse; forecast: ForecastResponse }> | undefined;
 
 /** The same drive from where the car is now. /plan stays the original, so there's something to compare with. */
 export function mockReplan(request: ReplanRequest): Promise<PlanResponse> {
-  return loadRoute(ROUTE_URL).then((route) => simulate(route, request).plan);
+  return loadRoute(ROUTE_URL).then((route) => planRace(route, request).plan);
+}
+
+/** One plan per scenario, after a pause that stands in for the optimiser, so Cancel can be tried. */
+export async function mockScenarios(scenarios: Scenario[], signal?: AbortSignal): Promise<{ plans: PlanResponse[] }> {
+  signal?.throwIfAborted(); // cancelled before we got here: a listener added now would never fire
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, 1200);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    });
+  });
+  const route = await loadRoute(ROUTE_URL, signal);
+  return {
+    plans: scenarios.map((s) => {
+      const from = { ...RACE_START, soc: s.start_soc };
+      const conditions: Conditions = {
+        cdaFactor: s.cda_factor,
+        cloudShiftH: s.weather_shift_h,
+        ...{ p10: { sun: 0.85, windMs: 1.5 }, p50: { sun: 1, windMs: 0 }, p90: { sun: 1.1, windMs: -1.5 } }[s.weather],
+      };
+      const planned = planRace(route, from, conditions).plan;
+      return s.strategy === "planned" ? planned : simulate(route, from, { ...conditions, constantKmh: averageSpeed(planned) }).plan;
+    }),
+  };
 }
 
 const RACE_START: ReplanRequest = { km: 0, time_utc: new Date(START_UTC).toISOString(), soc: 1 };
 
+/** What a scenario changes; the defaults are the forecast and the car as they are. */
+interface Conditions {
+  cdaFactor: number;
+  cloudShiftH: number; // clouds this many hours later (+) or earlier (-)
+  sun: number; // irradiance factor
+  windMs: number; // added headwind
+  cruiseKmh?: number; // the planner's base speed (planRace finds it)
+  constantKmh?: number; // or hold this speed all race, whatever the wind and battery
+}
+const AS_FORECAST: Conditions = { cdaFactor: 1, cloudShiftH: 0, sun: 1, windMs: 0 };
+const FINISH_SOC = 0.2;
+
+/**
+ * A crude stand-in for the optimiser: the cruise speed that reaches the finish with about
+ * FINISH_SOC left (by bisection), eased into headwinds and near the battery floor.
+ */
+export function planRace(route: RouteData, from: ReplanRequest = RACE_START, conditions = AS_FORECAST) {
+  let [slow, fast] = [40, 110];
+  for (let i = 0; i < 12; i++) {
+    const cruiseKmh = (slow + fast) / 2;
+    const end = simulate(route, from, { ...conditions, cruiseKmh }).plan.soc.at(-1)!;
+    if (end > FINISH_SOC) slow = cruiseKmh;
+    else fast = cruiseKmh;
+  }
+  return simulate(route, from, { ...conditions, cruiseKmh: slow });
+}
+
 /** Drive the route in STEP_KM steps from `from` and record what a plan and a forecast would say. */
-export function simulate(route: RouteData, from: ReplanRequest = RACE_START) {
+export function simulate(route: RouteData, from: ReplanRequest = RACE_START, conditions = AS_FORECAST) {
+  const irradiance = (lat: number, lon: number, t: number, km: number) =>
+    Math.min(1100, conditions.sun * clearSky(lat, lon, t) * cloudDimming(km - 80 * conditions.cloudShiftH)); // ~80 km of driving per hour
   const startT = Date.parse(from.time_utc);
   const plan: PlanResponse = {
     plan_id: "sample",
@@ -65,14 +119,14 @@ export function simulate(route: RouteData, from: ReplanRequest = RACE_START) {
   for (let km = from.km; ; km = Math.min(km + STEP_KM, route.lengthKm)) {
     const [lon, lat] = pointAtKm(route.line, route.cumKm, km);
     const arrival = { t, soc, ghi: irradiance(lat, lon, t, km) };
-    soc = charge(soc, parkedWh(lat, lon, t, departAt, km));
+    for (let p = t; p < departAt; p += HOUR_MS / 6) soc = charge(soc, solarW(irradiance(lat, lon, p, km)) / 6); // parked: array only
     t = departAt;
 
     const ghi = irradiance(lat, lon, t, km);
-    const headwind = 3 * Math.sin(km / 180) + 2 * Math.sin(km / 53 + 2);
-    // Slow down when the battery is under a straight line from where it started to 25% at the finish.
-    const target = from.soc - (from.soc - 0.25) * share(km);
-    const speed = clamp(80 + 300 * (soc - target), 40, 110);
+    const headwind = 3 * Math.sin(km / 180) + 2 * Math.sin(km / 53 + 2) + conditions.windMs;
+    // Ease off into a headwind (and push with a tailwind): it costs less than fighting it at one speed.
+    const planned = (conditions.cruiseKmh ?? 70) * (1 - 0.03 * headwind) * (soc < 0.15 ? 0.75 : 1);
+    const speed = conditions.constantKmh ?? clamp(planned, 30, 110);
     const spread = 0.02 + 0.1 * share(km);
 
     plan.km.push(km);
@@ -87,7 +141,7 @@ export function simulate(route: RouteData, from: ReplanRequest = RACE_START) {
     if (km >= route.lengthKm) break;
 
     const hours = STEP_KM / speed;
-    soc = charge(soc, (solarW(ghi) - drivingW(speed / 3.6, headwind)) * hours);
+    soc = charge(soc, (solarW(ghi) - drivingW(speed / 3.6, headwind, conditions.cdaFactor)) * hours);
     t += hours * HOUR_MS;
 
     departAt = t;
@@ -110,21 +164,14 @@ const charge = (soc: number, wh: number) => clamp(soc + wh / CAR.batteryWh, 0.02
 const solarW = (ghi: number) => ghi * CAR.arrayM2 * CAR.arrayEff;
 
 /** Battery power for driving, W: drag and rolling resistance through the drivetrain. */
-function drivingW(v: number, headwind: number) {
+function drivingW(v: number, headwind: number, cdaFactor: number) {
   const air = v + headwind;
-  const force = 0.5 * 1.18 * CAR.cdaM2 * air * Math.abs(air) + CAR.crr * CAR.massKg * 9.81;
+  const force = 0.5 * 1.18 * CAR.cdaM2 * cdaFactor * air * Math.abs(air) + CAR.crr * CAR.massKg * 9.81;
   return (force * v) / CAR.drivetrainEff;
 }
 
-/** Energy the parked car's array collects between two times, Wh (nothing after dark). */
-function parkedWh(lat: number, lon: number, from: number, to: number, km: number) {
-  let wh = 0;
-  for (let t = from; t < to; t += HOUR_MS / 6) wh += solarW(irradiance(lat, lon, t, km)) / 6;
-  return wh;
-}
-
-/** Clear-sky irradiance from the sun's height, dimmed by made-up clouds that drift along km. */
-function irradiance(lat: number, lon: number, t: number, km: number): number {
+/** Clear-sky irradiance from the sun's height (none after dark). */
+function clearSky(lat: number, lon: number, t: number): number {
   const date = new Date(t);
   const dayOfYear = (t - Date.UTC(date.getUTCFullYear(), 0, 0)) / (24 * HOUR_MS);
   const rad = Math.PI / 180;
@@ -132,9 +179,13 @@ function irradiance(lat: number, lon: number, t: number, km: number): number {
   const hourAngle = 15 * rad * (date.getUTCHours() + date.getUTCMinutes() / 60 + lon / 15 - 12);
   const sinHeight =
     Math.sin(lat * rad) * Math.sin(declination) + Math.cos(lat * rad) * Math.cos(declination) * Math.cos(hourAngle);
-  if (sinHeight <= 0) return 0;
+  return sinHeight <= 0 ? 0 : 1050 * sinHeight ** 1.2;
+}
+
+/** Made-up clouds laid along km: the share of sunlight that gets through. */
+function cloudDimming(km: number): number {
   const cloud = clamp(0.5 + 0.5 * Math.sin(km / 97) + 0.3 * Math.sin(km / 41 + 1), 0, 1);
-  return 1050 * sinHeight ** 1.2 * (1 - 0.6 * clamp((cloud - 0.6) / 0.4, 0, 1));
+  return 1 - 0.6 * clamp((cloud - 0.6) / 0.4, 0, 1);
 }
 
 const localHour = (t: number) => (t / HOUR_MS + UTC_OFFSET_H) % 24;

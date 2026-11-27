@@ -101,3 +101,17 @@ Multi-point weather forecast sampled along the route from the Open-Meteo Forecas
   default TTL 30 min (`cache_ttl_seconds=1800`). Use `use_cache=False` or delete the folder
   to force a fresh fetch.
 
+
+## API: `POST /scenarios` (draft)
+
+The what-if page (FE-05) sends up to three scenarios as `{"scenarios": [...]}`; BE-05 answers
+`{"plans": [...]}`, one plan per scenario in the same order, each in the `/plan` shape. The page
+lets the user cancel a run (it aborts the request). Mocked like the others until BE-05 exists.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `start_soc` | number | Battery at the start, 0–1 |
+| `weather_shift_h` | number | The clouds this many hours earlier (−1) or later (+1) than forecast |
+| `weather` | `p10` \| `p50` \| `p90` | Plan on the pessimistic, median or optimistic forecast |
+| `cda_factor` | number | Drag against the car profile, 0.9–1.1 |
+| `strategy` | `planned` \| `constant` | The optimiser's speeds, or the planned average speed held all race |

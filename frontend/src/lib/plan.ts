@@ -24,6 +24,15 @@ export interface ReplanRequest {
   soc: number; // 0–1
 }
 
+/** One what-if for POST /scenarios: what to change against the plan's own assumptions. */
+export interface Scenario {
+  start_soc: number; // 0–1
+  weather_shift_h: number; // -1 to +1: the clouds that much earlier (-) or later (+) than forecast
+  weather: "p10" | "p50" | "p90"; // plan on the pessimistic, median or optimistic forecast
+  cda_factor: number; // 0.9–1.1: the car draggier or slicker than its profile says
+  strategy: "planned" | "constant"; // constant: the planned average speed, held all race
+}
+
 /** GET /forecast: the weather along the route at the planned arrival times (WX-06). */
 export interface ForecastResponse {
   model: string;
@@ -135,7 +144,8 @@ export function stages(plan: PlanResponse): Stage[] {
   });
 }
 
-function averageSpeed(plan: PlanResponse, fromKm: number, toKm: number): number {
+/** Average driving speed between two km: distance over the planned time on the move. */
+export function averageSpeed(plan: PlanResponse, fromKm = plan.km[0], toKm = plan.km[plan.km.length - 1]): number {
   let km = 0;
   let hours = 0;
   for (let i = 1; i < plan.km.length; i++) {
