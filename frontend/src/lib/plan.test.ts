@@ -4,6 +4,7 @@ import {
   dayAt,
   daySummaries,
   lowestSocFrom,
+  plannedAt,
   raceClock,
   raceTimeToUtc,
   sample,
@@ -58,6 +59,14 @@ describe("timeAt and dayAt", () => {
     expect(dayAt(plan, 150)).toBe(1);
     expect(dayAt(plan, 151)).toBe(2);
     expect(dayAt(plan, 200)).toBe(2);
+  });
+
+  it("puts the car where the plan has it at a given instant", () => {
+    const at = (iso: string) => plannedAt({ ...plan, soc: [1, 0.8, 0.5] }, new Date(iso));
+    expect(at("2025-08-23T23:00:00Z")).toEqual({ phase: "before", start: new Date("2025-08-24T00:00:00Z") });
+    expect(at("2025-08-24T00:30:00Z")).toEqual({ phase: "racing", km: 0, day: 1, soc: 1 });
+    expect(at("2025-08-24T12:00:00Z")).toEqual({ phase: "racing", km: 100, day: 1, soc: 0.8 }); // overnight: held
+    expect(at("2025-08-24T23:00:00Z")).toEqual({ phase: "finished", finish: new Date("2025-08-24T23:00:00Z") });
   });
 });
 

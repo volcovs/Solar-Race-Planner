@@ -1,5 +1,8 @@
 import { cumulativeKm, sliceByKm, type LonLat, type Piece } from "./geo";
 
+// Until the API serves the route (BE-04): the file exported by the route pipeline (DAT-01).
+export const ROUTE_URL = `${import.meta.env.BASE_URL}sample/route.geojson`;
+
 export type StopKind = "start" | "control_stop" | "finish";
 
 export interface Stop {
