@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import type { RouteObject } from "react-router";
+import { CarPage } from "../pages/CarPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PlanPage } from "../pages/PlanPage";
 import { ReplanPage } from "../pages/ReplanPage";
@@ -16,6 +17,7 @@ const PAGES: Record<string, ReactNode> = {
   "/plan": <PlanPage />,
   "/replan": <ReplanPage />,
   "/what-if": <WhatIfPage />,
+  "/car": <CarPage />,
   "/map": (
     <Suspense fallback={<div className="flex-1 bg-surface-muted" />}>
       <MapPage />

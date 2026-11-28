@@ -67,6 +67,7 @@ there to the finish, in the `/plan` shape above. Its first stop is the re-plan p
 | `km` | number | The car's position, km from the start line |
 | `time_utc` | string | When it was there, ISO 8601 UTC (the page asks for local race time and converts) |
 | `soc` | number | Battery state of charge then, 0–1 |
+| `car` | object | The car profile, as in `configs/car.reference.yaml` (see below) |
 ## `data/forecasts/forecast.parquet` (v1)
 
 Multi-point weather forecast sampled along the route from the Open-Meteo Forecast API
@@ -115,3 +116,14 @@ lets the user cancel a run (it aborts the request). Mocked like the others until
 | `weather` | `p10` \| `p50` \| `p90` | Plan on the pessimistic, median or optimistic forecast |
 | `cda_factor` | number | Drag against the car profile, 0.9–1.1 |
 | `strategy` | `planned` \| `constant` | The optimiser's speeds, or the planned average speed held all race |
+
+The body also carries `car`, as for `/replan`.
+
+## The car profile in requests (draft)
+
+`POST /replan` and `POST /scenarios` carry the user's car as `car`, in the shape of
+`configs/car.reference.yaml` (`name`, `mass_kg`, `cda_m2`, `crr`, `drivetrain_eff`, `max_speed_kmh`,
+`array.{area_m2, efficiency, temp_coeff_per_c}`, `battery.{capacity_wh, min_soc, charge_eff,
+discharge_eff}`; fractions as 0–1). The Car page (FE-08) keeps it in the browser only, so the
+server must plan with it and not store it. The page checks the ranges in `frontend/src/lib/car.ts`;
+MOD-01's validation should use the same ones.
