@@ -207,3 +207,20 @@ export function compareStops(before: PlanResponse, after: PlanResponse): StopCha
 export function lowestSocFrom(plan: PlanResponse, km: number): number {
   return Math.min(...plan.soc.filter((_, i) => plan.km[i] >= km));
 }
+
+export type RaceMoment =
+  | { phase: "before"; start: Date }
+  | { phase: "racing"; km: number; day: number; soc: number }
+  | { phase: "finished"; finish: Date };
+
+/** Where the plan puts the car at instant `now`: before the start, on the road, or finished. */
+export function plannedAt(plan: PlanResponse, now: Date): RaceMoment {
+  const t = now.getTime();
+  const start = new Date(plan.time_utc[0]);
+  const finish = new Date(plan.time_utc[plan.time_utc.length - 1]);
+  if (t < start.getTime()) return { phase: "before", start };
+  if (t >= finish.getTime()) return { phase: "finished", finish };
+  let i = 0;
+  while (Date.parse(plan.time_utc[i + 1]) <= t) i++;
+  return { phase: "racing", km: plan.km[i], day: dayAt(plan, plan.km[i]), soc: plan.soc[i] };
+}

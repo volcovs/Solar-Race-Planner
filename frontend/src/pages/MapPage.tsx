@@ -6,11 +6,8 @@ import { SegmentCard } from "../components/map/SegmentCard";
 import type { Cursor } from "../components/timeline/RaceTimeline";
 import { TimelinePanel, type TimelineLoad } from "../components/timeline/TimelinePanel";
 import { getForecast, getPlan } from "../lib/api";
-import { loadRoute, segmentAtKm, type RouteData, type Stop } from "../lib/route";
+import { loadRoute, ROUTE_URL, segmentAtKm, type RouteData, type Stop } from "../lib/route";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-
-// Until the API serves the route (BE-04): the file exported by the route pipeline (DAT-01).
-const ROUTE_URL = `${import.meta.env.BASE_URL}sample/route.geojson`;
 
 const NO_STOPS: Stop[] = []; // one array, so the timeline doesn't redraw on every render
 
