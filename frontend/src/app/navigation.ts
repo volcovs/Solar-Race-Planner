@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListOrdered, Map, RefreshCw, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { CarFront, LayoutDashboard, ListOrdered, Map, RefreshCw, SlidersHorizontal, type LucideIcon } from "lucide-react";
 
 export interface Section {
   path: string;
@@ -44,5 +44,12 @@ export const SECTIONS: Section[] = [
     title: "Re-plan from here",
     description: "Enter where the car is and its battery level, and get a new plan for the rest of the route.",
     icon: RefreshCw,
+  },
+  {
+    path: "/car",
+    label: "Car",
+    title: "Car profile",
+    description: "Your car's mass, drag, array and battery; kept in this browser and sent with each plan request.",
+    icon: CarFront,
   },
 ];

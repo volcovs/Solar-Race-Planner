@@ -9,6 +9,8 @@ export default defineConfig({
     port: 5173,
     // In dev, /api/* goes to the FastAPI service.
     proxy: { "/api": { target: process.env.API_URL ?? "http://localhost:8000", rewrite: (p) => p.replace(/^\/api/, "") } },
+    // Also ../configs: a test checks the built-in reference car against configs/car.reference.yaml.
+    fs: { allow: [".", "../configs"] },
   },
   test: {
     environment: "jsdom",

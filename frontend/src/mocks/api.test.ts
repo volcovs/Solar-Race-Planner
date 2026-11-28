@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { REFERENCE_CAR } from "../lib/car";
 import { averageSpeed, type Scenario } from "../lib/plan";
 import { buildRoute } from "../lib/route";
 import { ROUTE_FILE } from "../test/fixtures";
@@ -54,7 +55,7 @@ describe("mock /scenarios", () => {
 
   it("answers each scenario; constant speed holds the planned run's average", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ROUTE_FILE })));
-    const { plans } = await mockScenarios([base, { ...base, strategy: "constant" }, { ...base, start_soc: 0.5 }]);
+    const { plans } = await mockScenarios([base, { ...base, strategy: "constant" }, { ...base, start_soc: 0.5 }], REFERENCE_CAR);
 
     expect(plans).toHaveLength(3);
     expect(new Set(plans[1].speed_kmh).size).toBe(1);
@@ -64,8 +65,17 @@ describe("mock /scenarios", () => {
 
   it("stops when cancelled", async () => {
     const abort = new AbortController();
-    const running = mockScenarios([base], abort.signal);
+    const running = mockScenarios([base], REFERENCE_CAR, abort.signal);
     abort.abort();
     await expect(running).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("plans for the car it's given", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ROUTE_FILE })));
+    const draggy = { ...REFERENCE_CAR, cda_m2: 0.4, battery: { ...REFERENCE_CAR.battery, min_soc: 0.2 } };
+    const [ref, slow] = await Promise.all([mockScenarios([base], REFERENCE_CAR), mockScenarios([base], draggy)]);
+
+    expect(slow.plans[0].min_soc).toBe(0.2);
+    expect(averageSpeed(slow.plans[0])).toBeLessThan(averageSpeed(ref.plans[0]));
   });
 });
