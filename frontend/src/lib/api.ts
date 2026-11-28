@@ -1,9 +1,10 @@
-import type { ForecastResponse, PlanResponse, ReplanRequest } from "./plan";
+import { currentCar } from "./car";
+import type { ForecastResponse, PlanResponse, ReplanRequest, Scenario } from "./plan";
 
 // Deployed builds set VITE_API_URL to the API URL; in dev, /api is proxied to localhost:8000.
 const BASE = import.meta.env.VITE_API_URL || "/api";
 
-// The API has no /plan, /forecast or /replan yet (BE-04, BE-05): until it does, they come from
+// The API has no /plan, /forecast, /replan or /scenarios yet (BE-04, BE-05): until it does, they come from
 // src/mocks. Build with VITE_API_MOCK=false to call the real ones.
 const MOCK_API = import.meta.env.VITE_API_MOCK !== "false";
 
@@ -32,14 +33,27 @@ export const getPlan = (signal?: AbortSignal) =>
 export const getForecast = (signal?: AbortSignal) =>
   MOCK_API ? getMock<ForecastResponse>("/forecast") : getJson<ForecastResponse>("/forecast", signal);
 
-/** A new plan from where the car is now. */
+/** A new plan from where the car is now, for the car on the Car page (sent with the request). */
 export async function replan(request: ReplanRequest): Promise<PlanResponse> {
-  if (MOCK_API) return (await import("../mocks/api")).mockReplan(request);
+  if (MOCK_API) return (await import("../mocks/api")).mockReplan(request, currentCar());
   const res = await fetch(`${BASE}/replan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ ...request, car: currentCar() }),
   });
   if (!res.ok) throw new Error(`/replan: ${res.status}`);
   return res.json() as Promise<PlanResponse>;
+}
+
+/** One plan per scenario, in the same order, for the car on the Car page. Abort `signal` to cancel. */
+export async function runScenarios(scenarios: Scenario[], signal?: AbortSignal): Promise<PlanResponse[]> {
+  if (MOCK_API) return (await (await import("../mocks/api")).mockScenarios(scenarios, currentCar(), signal)).plans;
+  const res = await fetch(`${BASE}/scenarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarios, car: currentCar() }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`/scenarios: ${res.status}`);
+  return ((await res.json()) as { plans: PlanResponse[] }).plans;
 }

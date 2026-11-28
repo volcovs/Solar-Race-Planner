@@ -1,16 +1,17 @@
-# Reference car profile. PLACEHOLDER values
+# Reference car profile. PLACEHOLDER values: a generic mid-field Challenger from typical
+# published figures, not any team's measurements. Teams enter their own on the Car page.
 name: reference-car
-mass_kg: 280            # with driver
-cda_m2: 0.20
-crr: 0.010
+mass_kg: 260            # with driver (ballasted to the 80 kg minimum)
+cda_m2: 0.10
+crr: 0.006              # solar-car tyres
 array:
-  area_m2: 4.0
-  efficiency: 0.23
+  area_m2: 4.0          # front-facing cells
+  efficiency: 0.24
   temp_coeff_per_c: -0.0029
 battery:
-  capacity_wh: 3000     # Challenger storage limit is 3 kWh
+  capacity_wh: 3060     # Challenger storage limit: 11 MJ
   min_soc: 0.10
   charge_eff: 0.97
   discharge_eff: 0.97
-drivetrain_eff: 0.94
+drivetrain_eff: 0.95
 max_speed_kmh: 110
