@@ -4,7 +4,8 @@ Distances are geodesic (WGS84 ellipsoid), the same measure as the route's `lengt
 segment's km is the route's km. A projected CRS would stretch them by up to ~0.4% over a
 3,000 km north–south route.
 
-Run (reads data/route/route.parquet, writes data/route/segments.parquet):
+Run (reads data/route/route.parquet and the race config; writes data/route/segments.parquet and
+data/route/control_stops.parquet):
     python -m solar_race_planner.ingest.segments
 """
 
@@ -16,10 +17,11 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import yaml
-from pyproj import Geod
 from shapely.geometry import LineString
 
-GEOD = Geod(ellps="WGS84")
+from solar_race_planner.ingest.control_stops import link, place_stops
+from solar_race_planner.ingest.line import GEOD, along, walk
+
 SEGMENT_M = 100.0
 
 
@@ -30,17 +32,15 @@ def segment_route(line: LineString, segment_m: float = SEGMENT_M) -> pd.DataFram
     km 123.4; the last segment may be shorter. `heading_deg` is the compass bearing of travel
     from the segment's start to its end (0 = north, 90 = east).
     """
-    lon, lat = np.asarray(line.coords).T[:2]
-    steps_m = GEOD.inv(lon[:-1], lat[:-1], lon[1:], lat[1:])[2]
-    walked_m = np.concatenate([[0.0], np.cumsum(steps_m)])
+    lon, lat, walked_m = walk(line)
     total_m = walked_m[-1]
 
     count = max(1, int(np.ceil(total_m / segment_m - 1e-9)))  # no sliver segment from rounding
     edges_m = np.append(np.arange(count) * segment_m, total_m)
 
-    start_lon, start_lat = _along(lon, lat, walked_m, edges_m[:-1])
-    end_lon, end_lat = _along(lon, lat, walked_m, edges_m[1:])
-    mid_lon, mid_lat = _along(lon, lat, walked_m, (edges_m[:-1] + edges_m[1:]) / 2)
+    start_lon, start_lat = along(lon, lat, walked_m, edges_m[:-1])
+    end_lon, end_lat = along(lon, lat, walked_m, edges_m[1:])
+    mid_lon, mid_lat = along(lon, lat, walked_m, (edges_m[:-1] + edges_m[1:]) / 2)
     heading = GEOD.inv(start_lon, start_lat, end_lon, end_lat)[0] % 360
 
     return pd.DataFrame(
@@ -53,14 +53,6 @@ def segment_route(line: LineString, segment_m: float = SEGMENT_M) -> pd.DataFram
             "heading_deg": heading,
         }
     )
-
-
-def _along(lon: np.ndarray, lat: np.ndarray, walked_m: np.ndarray, at_m: np.ndarray):
-    """(lon, lat) at distances along the line, linear between vertices (they are metres apart)."""
-    i = np.clip(np.searchsorted(walked_m, at_m, side="right") - 1, 0, len(walked_m) - 2)
-    step = walked_m[i + 1] - walked_m[i]
-    t = np.divide(at_m - walked_m[i], step, out=np.zeros_like(at_m), where=step > 0)
-    return lon[i] + t * (lon[i + 1] - lon[i]), lat[i] + t * (lat[i + 1] - lat[i])
 
 
 def check_direction(line: LineString, start: dict) -> None:
@@ -77,15 +69,23 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--config", type=Path, default=Path("configs/race.bwsc.yaml"))
     parser.add_argument("--route", type=Path, default=Path("data/route/route.parquet"))
     parser.add_argument("--out", type=Path, default=Path("data/route/segments.parquet"))
+    parser.add_argument("--stops-out", type=Path, default=Path("data/route/control_stops.parquet"))
     args = parser.parse_args(argv)
 
+    race = yaml.safe_load(args.config.read_text())
     line = gpd.read_parquet(args.route).geometry.iloc[0]
-    check_direction(line, yaml.safe_load(args.config.read_text())["route"]["start"])
-    segments = segment_route(line)
+    check_direction(line, race["route"]["start"])
+    segments, stops = link(segment_route(line), place_stops(line, race))
+
+    for stop in stops.itertuples():
+        off = f"{stop.off_route_m:.0f} m off the route" if stop.km_source == "snapped" else "on the highway"
+        print(f"  {stop.name:<16} official {stop.official_km:>7.1f}  route {stop.route_km:>8.2f}  ({off})")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     segments.to_parquet(args.out, index=False)
+    stops.to_parquet(args.stops_out, index=False)
     print(f"Wrote {args.out}: {len(segments)} segments, {segments.km_end.iloc[-1]:.3f} km")
+    print(f"Wrote {args.stops_out}: {len(stops)} control stops")
 
 
 if __name__ == "__main__":
