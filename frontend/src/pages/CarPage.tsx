@@ -141,7 +141,7 @@ export function CarPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={!valid || !unsaved} className="h-12 rounded-control bg-sun px-6 font-medium text-on-sun disabled:opacity-50">
+          <button type="submit" disabled={!valid || !unsaved} className="h-12 rounded-control bg-brand px-6 font-medium text-on-brand disabled:opacity-50">
             Save
           </button>
           <button type="button" onClick={download} disabled={!valid} className={SECONDARY}>

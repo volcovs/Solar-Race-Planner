@@ -39,7 +39,7 @@ export function RouteSketch({ route, km }: { route: RouteData; km: number | null
           </text>
         );
       })}
-      {car && <circle cx={car[0]} cy={car[1]} r={2.6} fill="var(--sun)" stroke="var(--surface)" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+      {car && <circle cx={car[0]} cy={car[1]} r={2.6} fill="var(--brand)" stroke="var(--surface)" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
     </svg>
   );
 }

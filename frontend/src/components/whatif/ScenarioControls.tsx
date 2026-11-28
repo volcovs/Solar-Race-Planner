@@ -114,7 +114,7 @@ function Slider(props: {
         value={props.current}
         aria-valuetext={props.value}
         onChange={(e) => props.onChange(Number(e.target.value))}
-        className="h-11 w-full accent-sun"
+        className="h-11 w-full accent-brand"
       />
     </div>
   );

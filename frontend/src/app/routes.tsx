@@ -1,6 +1,8 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import type { RouteObject } from "react-router";
+import { AboutPage } from "../pages/AboutPage";
 import { CarPage } from "../pages/CarPage";
+import { ContactPage } from "../pages/ContactPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { OverviewPage } from "../pages/OverviewPage";
 import { PlanPage } from "../pages/PlanPage";
@@ -34,6 +36,8 @@ export const routes: RouteObject[] = [
         path: section.path,
         element: PAGES[section.path],
       })),
+      { path: "/about", element: <AboutPage /> },
+      { path: "/contact", element: <ContactPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

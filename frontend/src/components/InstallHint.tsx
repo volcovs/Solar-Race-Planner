@@ -18,7 +18,7 @@ export function InstallHint() {
   };
 
   return (
-    <aside aria-label="Install" className="flex items-center gap-2 border-b border-line bg-sun-band py-1 pr-1 pl-4 text-sm text-sun-ink">
+    <aside aria-label="Install" className="flex items-center gap-2 border-b border-line bg-brand-band py-1 pr-1 pl-4 text-sm text-brand-ink">
       <p>
         Install: tap <Share className="inline size-4 align-text-bottom" aria-label="Share" /> then{" "}
         <span className="font-medium">Add to Home Screen</span>.

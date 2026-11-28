@@ -150,7 +150,7 @@ export function ReplanPage() {
           <button
             type="submit"
             disabled={run.status === "running" || !online}
-            className="mt-5 inline-flex h-12 items-center rounded-control bg-sun px-6 font-medium text-on-sun disabled:opacity-60"
+            className="mt-5 inline-flex h-12 items-center rounded-control bg-brand px-6 font-medium text-on-brand disabled:opacity-60"
           >
             {run.status === "running" ? "Re-planning…" : "Re-plan"}
           </button>

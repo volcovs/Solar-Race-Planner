@@ -53,7 +53,7 @@ export function UpdatePrompt() {
           <button type="button" onClick={() => setWaiting(null)} className={`${BUTTON} text-ink-muted hover:bg-surface-muted`}>
             Later
           </button>
-          <button type="button" onClick={reload} className={`${BUTTON} bg-sun text-on-sun`}>
+          <button type="button" onClick={reload} className={`${BUTTON} bg-brand text-on-brand`}>
             Reload
           </button>
         </>

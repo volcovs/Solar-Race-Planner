@@ -75,7 +75,7 @@ export function WhatIfPage() {
             type="button"
             onClick={start}
             disabled={!online}
-            className="h-12 rounded-control bg-sun px-6 font-medium text-on-sun disabled:opacity-60"
+            className="h-12 rounded-control bg-brand px-6 font-medium text-on-brand disabled:opacity-60"
           >
             Run scenarios
           </button>
