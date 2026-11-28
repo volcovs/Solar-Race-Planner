@@ -64,6 +64,23 @@ nothing to download. Open the deployed (HTTPS) address, then:
 address and on `localhost`, not on a laptop's address over local Wi-Fi. The icons are drawn
 from `frontend/public/icons/icon.svg`.
 
+### Offline
+
+Once opened with signal, the app works without it: a service worker (`vite-plugin-pwa`) keeps
+the app, the last plan and forecast, and the map tiles already seen. A banner says when the
+device is offline and how old the forecast is (also when it's over 6 hours old with signal).
+Re-plan and What-if need the server, so they say so offline. After a deploy, open copies offer
+**Reload** for the new version instead of swapping it in mid-race.
+
+The service worker exists only in builds, not in `npm run dev`. To try it, build and serve:
+
+```bash
+cd frontend && npm run build && npx vite preview
+```
+
+`frontend/package.json` overrides `glob` for `workbox-build` (build-time only) to a version
+without published advisories.
+
 ## Release
 
 Merging to `main` deploys (see `docs/deployment.md`). A release gives that version a

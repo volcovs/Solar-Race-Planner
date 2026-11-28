@@ -1,10 +1,12 @@
 import { Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
+import { DataBanner } from "../components/DataBanner";
 import { InstallHint } from "../components/InstallHint";
 import { StatusPill } from "../components/StatusPill";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SECTIONS } from "./navigation";
+import { UpdatePrompt } from "./UpdatePrompt";
 
 /**
  * Navigation in the style of GitHub: a header row (brand, API status, theme) and a row of
@@ -69,9 +71,11 @@ export function AppLayout() {
 
       {/* On phones, leave room for the bottom bar (and the home indicator under it). */}
       <main id="main" tabIndex={-1} className="flex flex-1 flex-col max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+        <DataBanner />
         <InstallHint />
         <Outlet />
       </main>
+      <UpdatePrompt />
     </div>
   );
 }

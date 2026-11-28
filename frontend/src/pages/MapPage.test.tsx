@@ -82,6 +82,21 @@ describe("MapPage", () => {
     expect(screen.queryByRole("region", { name: "Selected stretch" })).not.toBeInTheDocument();
   });
 
+  it("still shows the route and stops when the base map can't load (offline)", async () => {
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/map"] })} />);
+    await screen.findByText(/Start → End/);
+    const map = FakeMap.instances.at(-1)!;
+
+    act(() => map.emit("error")); // the style URL failed before it ever loaded
+    expect(map.setStyle).toHaveBeenCalledWith(expect.objectContaining({ version: 8, sources: {} }), { diff: false });
+
+    act(() => map.emit("style.load"));
+    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "cursor"]); // no names: no fonts offline
+
+    act(() => map.emit("error")); // later errors are single tiles: no second fallback
+    expect(map.setStyle).toHaveBeenCalledTimes(1);
+  });
+
   it("switches to the dark base map with the theme", async () => {
     const { map } = await openMap();
 

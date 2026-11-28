@@ -6,6 +6,7 @@ import { ScenarioControls } from "../components/whatif/ScenarioControls";
 import { ScenarioResult } from "../components/whatif/ScenarioResult";
 import { runScenarios } from "../lib/api";
 import { zoneLabel, type PlanResponse, type Scenario } from "../lib/plan";
+import { useOnline } from "../lib/useOnline";
 
 const AS_PLANNED: Scenario = { start_soc: 1, weather_shift_h: 0, weather: "p50", cda_factor: 1, strategy: "planned" };
 const NAMES = ["A", "B", "C"];
@@ -23,6 +24,7 @@ export function WhatIfPage() {
   // Start with the question people ask first: is varying the speed worth it over cruising?
   const [scenarios, setScenarios] = useState<Scenario[]>([AS_PLANNED, { ...AS_PLANNED, strategy: "constant" }]);
   const [run, setRun] = useState<Run>({ status: "idle" });
+  const online = useOnline();
   const abort = useRef<AbortController>();
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -69,7 +71,12 @@ export function WhatIfPage() {
             </button>
           </>
         ) : (
-          <button type="button" onClick={start} className="h-12 rounded-control bg-sun px-6 font-medium text-on-sun">
+          <button
+            type="button"
+            onClick={start}
+            disabled={!online}
+            className="h-12 rounded-control bg-sun px-6 font-medium text-on-sun disabled:opacity-60"
+          >
             Run scenarios
           </button>
         )}
@@ -84,6 +91,7 @@ export function WhatIfPage() {
             Add scenario
           </button>
         )}
+        {!online && <span className="text-sm text-ink-muted">Needs signal: plans are made on the server.</span>}
         {stale && <span className="text-sm text-ink-muted">Settings changed since the last run.</span>}
         {run.status === "error" && (
           <p role="alert" className="text-risk">
