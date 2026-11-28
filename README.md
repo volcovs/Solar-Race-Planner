@@ -39,6 +39,8 @@ cd frontend && npm run dev                          # web app on http://localhos
 
 **Once the API serves actual data, rebuild the project and run with `VITE_API_MOCK=false`.**
 
+`VITE_REPO_URL` (optional, at build time) points the web app's About and Contact links at a fork.
+
 Test and lint (run before opening a PR):
 
 ```bash
@@ -109,4 +111,12 @@ such as `v0.2.0-rc.1` makes a pre-release. After changing the version, rerun
 | [docs/bwsc-facts.md](docs/bwsc-facts.md) | The competition |
 
 ## Data and licences
-TBD
+
+| Data | Source | Licence |
+|---|---|---|
+| Route and base map | © OpenStreetMap contributors | ODbL |
+| Map tiles | OpenFreeMap, © OpenMapTiles | free, no key |
+| Weather forecasts | Open-Meteo | CC BY 4.0 |
+| Land cover | © ESA WorldCover project / Copernicus Sentinel data | CC BY 4.0 |
+
+The web app's About page shows this README without its commands; keep the two in step.

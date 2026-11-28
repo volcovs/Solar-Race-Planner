@@ -21,7 +21,7 @@ export function BatteryStrip({ plan, km }: { plan: PlanResponse; km: number | nu
       <polygon points={band} fill="var(--battery-band)" />
       <line x1={0} x2={W} y1={y(plan.min_soc)} y2={y(plan.min_soc)} stroke="var(--risk)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
       <polyline points={line(plan.soc).join(" ")} fill="none" stroke="var(--battery)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-      {km !== null && <line x1={x(km)} x2={x(km)} y1={0} y2={H} stroke="var(--sun)" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+      {km !== null && <line x1={x(km)} x2={x(km)} y1={0} y2={H} stroke="var(--brand)" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
     </svg>
   );
 }

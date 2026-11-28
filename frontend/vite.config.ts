@@ -1,5 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -38,6 +39,15 @@ function serviceWorker(api: RegExp): Plugin {
   };
 }
 
+/** The last commit's date (the footer's "Updated"), or now when built outside git (e.g. in Docker). */
+function lastUpdate(): string {
+  try {
+    return execSync("git log -1 --format=%cI", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd()), ...process.env };
   // Only the plan and forecast are kept for offline; /health must say when the API is unreachable.
@@ -45,6 +55,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: process.env.VITE_BASE ?? "/",
+    define: { __LAST_UPDATE__: JSON.stringify(lastUpdate()) },
     plugins: [react(), tailwindcss(), serviceWorker(new RegExp(`${api}/(plan|forecast)(\\?|$)`))],
     server: {
       port: 5173,

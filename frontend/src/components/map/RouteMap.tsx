@@ -170,6 +170,9 @@ function addRouteLayers(
   map.addSource(SEGMENTS, {
     type: "geojson",
     attribution: ROUTE_CREDIT,
+    // The route is many short pieces; zoomed out each is under a pixel, and the default tolerance
+    // would drop them all. The line is already simplified (~25 m), so nothing is lost by keeping them.
+    tolerance: 0,
     data: {
       type: "FeatureCollection",
       features: route.segments.map(({ id, coords }) => ({
@@ -213,7 +216,7 @@ function addRouteLayers(
     source: STOPS,
     paint: {
       "circle-radius": ["match", ["get", "kind"], "control_stop", 5, 7],
-      "circle-color": ["match", ["get", "kind"], "control_stop", readToken("--surface"), readToken("--sun")],
+      "circle-color": ["match", ["get", "kind"], "control_stop", readToken("--surface"), readToken("--brand")],
       "circle-stroke-color": readToken("--ink"),
       "circle-stroke-width": 2,
     },

@@ -54,6 +54,13 @@ describe("MapPage", () => {
     expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "stops-label", "cursor"]);
   });
 
+  it("keeps every piece of the route when zoomed out to the whole route", async () => {
+    const { map } = await openMap();
+
+    // Each 5 km piece is under a pixel there; with the default tolerance MapLibre would drop them all.
+    expect(map.getSource("segments")?.spec).toMatchObject({ tolerance: 0 });
+  });
+
 
   it("has a button that shows the whole route", async () => {
     const { map } = await openMap();

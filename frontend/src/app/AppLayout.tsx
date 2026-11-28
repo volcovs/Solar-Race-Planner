@@ -1,19 +1,14 @@
-import { Sun } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { DataBanner } from "../components/DataBanner";
 import { InstallHint } from "../components/InstallHint";
+import { SiteFooter } from "../components/SiteFooter";
+import { SolarCarMark } from "../components/SolarCarMark";
 import { StatusPill } from "../components/StatusPill";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { SECTIONS } from "./navigation";
 import { UpdatePrompt } from "./UpdatePrompt";
 
-/**
- * Navigation in the style of GitHub: a header row (brand, API status, theme) and a row of
- * underlined tabs. On phones the same tabs become a bar along the bottom, within thumb reach.
- * `main` fills the rest of the screen; pages choose their own width (see PageContainer),
- * so a map can run edge to edge under the header.
- */
 export function AppLayout() {
   const tabs = useRef<HTMLUListElement>(null);
   const { pathname } = useLocation();
@@ -24,7 +19,8 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    // On phones, leave room for the bottom tab bar (and the home indicator under it).
+    <div className="flex min-h-dvh flex-col max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
       <a
         href="#main"
         className="sr-only z-50 rounded-control bg-surface px-4 py-3 focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -54,7 +50,7 @@ export function AppLayout() {
                   end
                   className={({ isActive }) =>
                     `group relative flex h-12 items-center px-1 text-sm font-medium after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full max-md:h-14 max-md:justify-center max-md:after:top-0 max-md:after:bottom-auto ${
-                      isActive ? "text-ink after:bg-sun" : "text-ink-muted hover:text-ink"
+                      isActive ? "text-ink after:bg-brand" : "text-ink-muted hover:text-ink"
                     }`
                   }
                 >
@@ -69,12 +65,13 @@ export function AppLayout() {
         </nav>
       </header>
 
-      {/* On phones, leave room for the bottom bar (and the home indicator under it). */}
-      <main id="main" tabIndex={-1} className="flex flex-1 flex-col max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+      <main id="main" tabIndex={-1} className="flex flex-1 flex-col">
         <DataBanner />
         <InstallHint />
         <Outlet />
       </main>
+      {/* The map fills the screen like an app; everywhere else the page ends with the footer. */}
+      {pathname !== "/map" && <SiteFooter />}
       <UpdatePrompt />
     </div>
   );
@@ -83,8 +80,8 @@ export function AppLayout() {
 function Brand() {
   return (
     <NavLink to="/" aria-label="Solar Race Planner, overview" className="flex min-h-11 min-w-11 items-center gap-2.5 rounded-control">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-sun text-on-sun">
-        <Sun className="size-[18px]" aria-hidden />
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-brand text-on-brand">
+        <SolarCarMark className="w-6" />
       </span>
       <span className="hidden font-display text-[17px] font-semibold tracking-tight sm:inline">Solar Race Planner</span>
     </NavLink>

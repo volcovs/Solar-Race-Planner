@@ -48,7 +48,7 @@ export function DataBanner() {
     <aside
       aria-label="Data status"
       className={`flex items-center gap-2 border-b px-4 py-2 text-sm md:px-6 ${
-        online ? "border-line bg-surface-muted text-ink" : "border-sun-band bg-sun-band text-sun-ink"
+        online ? "border-line bg-surface-muted text-ink" : "border-brand-band bg-brand-band text-brand-ink"
       }`}
     >
       {online ? <Clock className="size-4 shrink-0" aria-hidden /> : <WifiOff className="size-4 shrink-0" aria-hidden />}
