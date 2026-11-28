@@ -10,7 +10,7 @@ export function MapPanel({ route, children }: { route?: RouteData; children?: Re
   const controlStops = route?.stops.filter((s) => s.kind === "control_stop").length ?? 0;
 
   return (
-    <section className="absolute top-3 right-14 left-3 z-10 rounded-card border border-line bg-surface/95 p-4 shadow-lg backdrop-blur md:top-4 md:right-auto md:left-4 md:w-[360px]">
+    <section className="absolute top-3 right-14 left-3 z-10 max-h-[calc(100%-1.5rem)] overflow-y-auto rounded-card border border-line bg-surface/95 p-4 shadow-lg backdrop-blur md:top-4 md:right-auto md:left-4 md:w-[360px]">
       <h1 className="font-display text-xl font-semibold tracking-tight">Route map</h1>
       {route && start && finish && (
         <p className="mt-0.5 text-sm text-ink-muted">
