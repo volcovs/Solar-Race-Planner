@@ -18,6 +18,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("PlanPage", () => {
+  it("keeps the phone's screen on while it's open", async () => {
+    const release = vi.fn();
+    const request = vi.fn(async () => ({ release }));
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request } });
+
+    const { unmount } = render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/plan"] })} />);
+    await screen.findByRole("region", { name: "Day by day" });
+    expect(request).toHaveBeenCalledWith("screen");
+
+    unmount();
+    expect(release).toHaveBeenCalled();
+    delete (navigator as { wakeLock?: unknown }).wakeLock;
+  });
+
+
   it("shows the plan day by day and stop by stop, in local race time", async () => {
     render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/plan"] })} />);
 

@@ -72,7 +72,7 @@ describe("MapPage", () => {
     const { map } = await openMap();
     map.queryRenderedFeatures.mockReturnValue([{ id: 0 }]);
 
-    act(() => map.emit("click", { point: { x: 10, y: 10 } }));
+    act(() => map.emit("click", { point: { x: 10, y: 10 }, lngLat: { lng: 0.02, lat: 0 } }));
 
     expect(screen.getByRole("heading", { name: "km 0–5" })).toBeInTheDocument();
     expect(map.setFeatureState).toHaveBeenCalledWith({ source: "segments", id: 0 }, { selected: true });
@@ -138,6 +138,18 @@ describe("MapPage", () => {
 
       act(() => chart.zrHandlers.click.forEach((handler) => handler()));
       expect(screen.getByRole("heading", { name: "km 100–105" })).toBeInTheDocument();
+    });
+
+    it("shows the values where the route is tapped, and clears them on a tap beside it", async () => {
+      const { map } = await openTimeline();
+
+      map.queryRenderedFeatures.mockReturnValue([{ id: 2 }]);
+      act(() => map.emit("click", { point: { x: 1, y: 1 }, lngLat: { lng: 0.11, lat: 0 } }));
+      expect(cursorCard()).toHaveTextContent(/km 1[0-5]/);
+
+      map.queryRenderedFeatures.mockReturnValue([]);
+      act(() => map.emit("click", { point: { x: 1, y: 1 }, lngLat: { lng: 2, lat: 2 } }));
+      expect(cursorCard()).not.toBeInTheDocument();
     });
 
     it("can be driven from the keyboard", async () => {
