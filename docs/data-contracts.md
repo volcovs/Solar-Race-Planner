@@ -23,7 +23,7 @@ The race route as one line, built from OpenStreetMap by
 `data/route/raw/overpass.json` caches the Overpass response with its query; delete it
 or pass `--refresh` to download again.
 
-## `data/route/segments.parquet` (v1)
+## `data/route/segments.parquet` (v2)
 
 The route cut every 100 m from the start line, built from `route.parquet` by
 `python -m solar_race_planner.ingest.segments` (DAT-02). Parquet, one row per segment in
@@ -38,9 +38,30 @@ contiguous, and the last `km_end` is the route's `length_km`.
 | `lat` | float64 | degrees, EPSG:4326 | Midpoint latitude |
 | `lon` | float64 | degrees, EPSG:4326 | Midpoint longitude |
 | `heading_deg` | float64 | degrees, 0–360 | Compass bearing of travel from the segment's start to its end (0 = north, 90 = east); the direction the car drives, which wind angles (MOD-03) use |
+| `control_stop` | bool | | The segment holds a control stop (DAT-03) |
+| `control_stop_name` | string, null | | That stop's name; null elsewhere |
 
-The command refuses a route line that doesn't begin at the race start, since its headings would
-point backwards.
+v2 added `control_stop` and `control_stop_name`. The command refuses a route line that doesn't
+begin at the race start, since its headings would point backwards.
+
+## `data/route/control_stops.parquet` (v1)
+
+The race's control stops placed on the route, written with `segments.parquet` (DAT-03). One row
+per stop, in race order. Official km (race notes) and route km (OpenStreetMap) differ by a few km;
+**the model uses `route_km`**. Stop duration, the driving window and the charging windows are in
+the race config (`configs/race.*.yaml`), not here.
+
+| Column | Type | Unit | Meaning |
+|---|---|---|---|
+| `stop_id` | int32 | | 1 for the first stop, in race order |
+| `name` | string | | As in the race config |
+| `official_km` | float64 | km | From the race notes |
+| `route_km` | float64 | km | Where the stop is on our route |
+| `lat` | float64 | degrees, EPSG:4326 | The stop's point on the route |
+| `lon` | float64 | degrees, EPSG:4326 | |
+| `off_route_m` | float64, null | m | How far the config's coordinates are from the route; null when interpolated |
+| `km_source` | string | | `snapped`: the config gives coordinates, snapped to the nearest point on the route (of two near-equal passes, the one nearer the official km). `interpolated`: no coordinates (a stop on the highway), so the official km corrected by the stops around it |
+| `segment_id` | int32 | | The segment it is on |
 
 
 ## API: `GET /plan` and `GET /forecast` (draft)

@@ -27,7 +27,7 @@ Build the data (network required; outputs go to `data/`, which is git-ignored):
 
 ```bash
 python -m solar_race_planner.ingest.route      # race route from OpenStreetMap → data/route/route.parquet
-python -m solar_race_planner.ingest.segments   # the route in 100 m segments → data/route/segments.parquet
+python -m solar_race_planner.ingest.segments   # 100 m segments and control stops → data/route/segments.parquet, control_stops.parquet
 ```
 
 Run (two terminals, with the venv active for the API):
