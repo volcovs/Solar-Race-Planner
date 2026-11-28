@@ -47,7 +47,7 @@ export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Pr
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const theme = useTheme();
-  const styleLoaded = useRef(false); // until then, an error means the base map itself can't load
+  const styleLoaded = useRef(false);
   // The style.load handler re-adds layers after every style change and needs the latest props.
   const latest = useRef({ route, selectedId, onSelect, cursorKm, onCursor });
   latest.current = { route, selectedId, onSelect, cursorKm, onCursor };
@@ -70,8 +70,8 @@ export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Pr
       styleLoaded.current = true;
       addRouteLayers(map, latest.current);
     });
-    // No signal and no cached copy: the base map can't load. A plain background instead, so the
-    // route and stops still show. (After it loads, errors are single tiles; the map carries on.)
+    // Offline with no saved copy, the base map can't load: show the route on a plain background.
+    // (Errors after it loads are single tiles.)
     map.on("error", () => {
       if (styleLoaded.current) return;
       styleLoaded.current = true;
@@ -207,23 +207,20 @@ function addRouteLayers(
       "circle-stroke-width": 2,
     },
   });
-  // Stop names need the base map's fonts; the plain offline style has none.
-  if (map.getStyle().glyphs) {
-    map.addLayer({
-      id: "stops-label",
-      type: "symbol",
-      source: STOPS,
-      layout: {
-        "text-field": ["get", "name"],
-        "text-font": LABEL_FONT,
-        "text-size": 12,
-        "text-offset": [0, 1],
-        "text-anchor": "top",
-        "text-optional": true,
-      },
-      paint: { "text-color": readToken("--ink"), "text-halo-color": readToken("--surface"), "text-halo-width": 1.5 },
-    });
-  }
+  map.addLayer({
+    id: "stops-label",
+    type: "symbol",
+    source: STOPS,
+    layout: {
+      "text-field": ["get", "name"],
+      "text-font": LABEL_FONT,
+      "text-size": 12,
+      "text-offset": [0, 1],
+      "text-anchor": "top",
+      "text-optional": true,
+    },
+    paint: { "text-color": readToken("--ink"), "text-halo-color": readToken("--surface"), "text-halo-width": 1.5 },
+  });
 
   map.addSource(CURSOR, { type: "geojson", data: cursorFeatures(route, cursorKm) });
   map.addLayer({
@@ -241,10 +238,11 @@ function addRouteLayers(
   if (selectedId !== null) map.setFeatureState({ source: SEGMENTS, id: selectedId }, { selected: true });
 }
 
-/** The base map's stand-in when it can't load: the background colour alone. */
+/** The base map's stand-in offline: a plain background (and its fonts, for stop names, if saved). */
 function plainStyle(): StyleSpecification {
   return {
     version: 8,
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
     sources: {},
     layers: [{ id: "background", type: "background", paint: { "background-color": readToken("--surface-muted") } }],
   };

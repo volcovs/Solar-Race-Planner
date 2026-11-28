@@ -1,59 +1,51 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { loadEnv, searchForWorkspaceRoot } from "vite";
-import { VitePWA } from "vite-plugin-pwa";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
+import { loadEnv, searchForWorkspaceRoot, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/**
+ * Writes dist/sw.js from src/service-worker.js: every built file to save for offline, and a
+ * version from their contents, so each deploy is a new worker (and the app offers "Reload").
+ */
+function serviceWorker(api: RegExp): Plugin {
+  let root = "";
+  let outDir = "";
+  return {
+    name: "service-worker",
+    apply: "build",
+    configResolved(config) {
+      root = config.root;
+      outDir = join(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const files = readdirSync(outDir, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name !== "sw.js" && !entry.name.startsWith("."))
+        .map((entry) => relative(outDir, join(entry.parentPath, entry.name)).split(sep).join("/"))
+        .sort();
+      const hash = createHash("sha256");
+      for (const file of files) hash.update(file).update(readFileSync(join(outDir, file)));
+      const source = readFileSync(join(root, "src/service-worker.js"), "utf8")
+        .replace("__FILES__", JSON.stringify(files))
+        .replace("__VERSION__", JSON.stringify(hash.digest("hex").slice(0, 12)))
+        .replace("__API__", JSON.stringify(api.source));
+      writeFileSync(join(outDir, "sw.js"), source);
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd()), ...process.env };
-  // The API calls the service worker may answer from its cache when offline: the plan and the
-  // forecast. Not /health, which must say "offline" when the API can't be reached.
+  // Only the plan and forecast are kept for offline; /health must say when the API is unreachable.
   const api = env.VITE_API_URL ? `^${escapeRegExp(env.VITE_API_URL.replace(/\/$/, ""))}` : "^[^?#]*/api";
-  const cachedApi = new RegExp(`${api}/(plan|forecast)(\\?|$)`);
 
   return {
     base: process.env.VITE_BASE ?? "/",
-    plugins: [
-      react(),
-      tailwindcss(),
-      // Offline (FE-09): a service worker keeps the app, the last plan and forecast, and the map
-      // tiles already seen. Only in builds; `npm run dev` runs without it.
-      VitePWA({
-        manifest: false, // public/manifest.json
-        registerType: "prompt", // a new version waits for the user (src/app/UpdatePrompt.tsx)
-        injectRegister: false,
-        workbox: {
-          globPatterns: ["**/*.{html,js,mjs,css,woff2,svg,png,json,geojson}"],
-          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // the map chunk is ~1 MB
-          navigateFallback: "index.html",
-          navigateFallbackDenylist: [/^\/api\//],
-          // On the first visit, take charge of the open page at once, so the tiles and plan seen
-          // then are saved too. (Updates still wait for "Reload": there's an old version in charge.)
-          clientsClaim: true,
-          runtimeCaching: [
-            {
-              urlPattern: cachedApi,
-              handler: "NetworkFirst",
-              options: { cacheName: "api", networkTimeoutSeconds: 8, expiration: { maxEntries: 10 } },
-            },
-            {
-              // Map tiles and fonts don't change at a given URL: once seen, from the cache.
-              urlPattern: /^https:\/\/tiles\.openfreemap\.org\/.*\.(pbf|png|jpg|webp)$/,
-              handler: "CacheFirst",
-              options: { cacheName: "map-tiles", expiration: { maxEntries: 4000, maxAgeSeconds: 30 * 24 * 3600 } },
-            },
-            {
-              // The map styles, sprites and tile catalogue do change: the cached copy, refreshed behind it.
-              urlPattern: /^https:\/\/tiles\.openfreemap\.org\//,
-              handler: "StaleWhileRevalidate",
-              options: { cacheName: "map-styles", expiration: { maxEntries: 50 } },
-            },
-          ],
-        },
-      }),
-    ],
+    plugins: [react(), tailwindcss(), serviceWorker(new RegExp(`${api}/(plan|forecast)(\\?|$)`))],
     server: {
       port: 5173,
       // In dev, /api/* goes to the FastAPI service.

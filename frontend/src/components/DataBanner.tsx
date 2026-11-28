@@ -23,15 +23,11 @@ export function age(from: Date, now = new Date()): string {
   return relative.format(Math.round(seconds / size), unit);
 }
 
-/**
- * Under the header: "offline" when there's no signal, and the forecast's age whenever it's
- * offline or old. With signal and a fresh forecast it stays out of the way.
- */
+/** Says when the app is offline, and the forecast's age when offline or old; otherwise hidden. */
 export function DataBanner() {
   const online = useOnline();
   const [issued, setIssued] = useState<Date | null>();
 
-  // Checked on start and whenever the signal comes back (offline, it's the copy saved on this device).
   useEffect(() => {
     let active = true;
     getForecast()

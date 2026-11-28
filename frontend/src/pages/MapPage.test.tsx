@@ -91,7 +91,7 @@ describe("MapPage", () => {
     expect(map.setStyle).toHaveBeenCalledWith(expect.objectContaining({ version: 8, sources: {} }), { diff: false });
 
     act(() => map.emit("style.load"));
-    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "cursor"]); // no names: no fonts offline
+    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "stops-label", "cursor"]);
 
     act(() => map.emit("error")); // later errors are single tiles: no second fallback
     expect(map.setStyle).toHaveBeenCalledTimes(1);

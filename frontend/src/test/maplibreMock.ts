@@ -9,10 +9,7 @@ export class Map {
   readonly sources = new globalThis.Map<string, { setData: ReturnType<typeof vi.fn> }>();
   readonly layers = new Set<string>();
   readonly controls: { onAdd: (map: Map) => HTMLElement }[] = [];
-  style: unknown;
-  setStyle = vi.fn((style: unknown) => {
-    this.style = style;
-  });
+  setStyle = vi.fn();
   fitBounds = vi.fn();
   setFeatureState = vi.fn();
   easeTo = vi.fn();
@@ -20,13 +17,7 @@ export class Map {
   queryRenderedFeatures = vi.fn((): { id?: number }[] => []);
 
   constructor(readonly options: { style: string }) {
-    this.style = options.style;
     Map.instances.push(this);
-  }
-
-  /** A style URL stands for a base map, which has fonts; a style object is our plain one. */
-  getStyle() {
-    return typeof this.style === "object" ? this.style : { glyphs: "base map fonts" };
   }
 
   /** Fire a map event as MapLibre would. */
