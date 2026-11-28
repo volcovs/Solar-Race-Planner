@@ -7,6 +7,7 @@ import { getPlan, replan } from "../lib/api";
 import { nearestKm } from "../lib/geo";
 import { raceTimeToUtc, zoneLabel, type PlanResponse, type ReplanRequest } from "../lib/plan";
 import { loadRoute, type RouteData } from "../lib/route";
+import { useOnline } from "../lib/useOnline";
 
 // Until the API serves the route (BE-04): the file exported by the route pipeline (DAT-01).
 const ROUTE_URL = `${import.meta.env.BASE_URL}sample/route.geojson`;
@@ -30,6 +31,7 @@ const oneDecimal = new Intl.NumberFormat("en", { maximumFractionDigits: 1 });
 
 /** Where the car is now (km, clock, battery) → a new plan to the finish, compared with the previous one. */
 export function ReplanPage() {
+  const online = useOnline();
   const [plan, setPlan] = useState<PlanResponse>();
   const [loadError, setLoadError] = useState<string>();
   const [fields, setFields] = useState<Fields>({ km: "", day: "1", clock: "", soc: "" });
@@ -147,11 +149,12 @@ export function ReplanPage() {
 
           <button
             type="submit"
-            disabled={run.status === "running"}
+            disabled={run.status === "running" || !online}
             className="mt-5 inline-flex h-12 items-center rounded-control bg-sun px-6 font-medium text-on-sun disabled:opacity-60"
           >
             {run.status === "running" ? "Re-planning…" : "Re-plan"}
           </button>
+          {!online && <p className="mt-3 text-sm text-ink-muted">Needs signal: plans are made on the server.</p>}
           {run.status === "error" && (
             <p role="alert" className="mt-3 text-risk">
               Couldn't re-plan ({run.message}).

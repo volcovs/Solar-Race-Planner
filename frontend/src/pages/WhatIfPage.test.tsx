@@ -37,6 +37,15 @@ describe("WhatIfPage", () => {
     expect(within(scenario("B")).getAllByText(/no change|pts|min|km\/h/).length).toBeGreaterThan(0);
   });
 
+  it("needs signal to run", () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    openWhatIf();
+
+    expect(button("Run scenarios")).toBeDisabled();
+    expect(screen.getByText("Needs signal: plans are made on the server.")).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it("can be cancelled while it runs", async () => {
     openWhatIf();
     fireEvent.click(button("Run scenarios"));

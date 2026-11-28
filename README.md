@@ -64,6 +64,16 @@ nothing to download. Open the deployed (HTTPS) address, then:
 address and on `localhost`, not on a laptop's address over local Wi-Fi. The icons are drawn
 from `frontend/public/icons/icon.svg`.
 
+### Offline
+
+Once opened with signal, the app works without it: its service worker
+(`frontend/src/service-worker.js`) keeps the app, the last plan and forecast, and the map tiles
+seen. A banner shows when it's offline and how old the forecast is. It exists only in builds:
+
+```bash
+cd frontend && npm run build && npx vite preview
+```
+
 ## Release
 
 Merging to `main` deploys (see `docs/deployment.md`). A release gives that version a

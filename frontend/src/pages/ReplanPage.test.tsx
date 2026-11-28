@@ -81,6 +81,15 @@ describe("ReplanPage", () => {
     expect(rows.map((r) => r.textContent)).toEqual(["Middlekm 150", "Endkm 334"]);
   });
 
+  it("needs signal to re-plan", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    await openReplan();
+
+    expect(screen.getByRole("button", { name: "Re-plan" })).toBeDisabled();
+    expect(screen.getByText("Needs signal: plans are made on the server.")).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   describe("Use my location", () => {
     it("fills the km from the phone's position, snapped to the route", async () => {
       stubGps({ lonLat: [1, 0.001] }); // beside the fixture route, one degree (~111 km) from the start

@@ -6,13 +6,15 @@ import { ROUTE_FILE } from "../test/fixtures";
 import { Chart as FakeChart } from "../test/echartsMock";
 import { Map as FakeMap } from "../test/maplibreMock";
 
-function respondWith(routeFile: unknown, ok = true) {
+function respondWith(routeFile: unknown, ok = true, tilesOk = true) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) =>
       url.endsWith("route.geojson")
         ? { ok, status: ok ? 200 : 404, json: async () => routeFile }
-        : { ok: true, json: async () => ({ status: "ok", version: "0.1.0" }) },
+        : url.endsWith("/register") // the satellite layer's tile service
+          ? { ok: tilesOk, status: tilesOk ? 200 : 503, json: async () => ({ searchid: "abc123" }) }
+          : { ok: true, json: async () => ({ status: "ok", version: "0.1.0" }) },
     ),
   );
 }
@@ -80,6 +82,21 @@ describe("MapPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close details" }));
     expect(screen.queryByRole("region", { name: "Selected stretch" })).not.toBeInTheDocument();
+  });
+
+  it("still shows the route and stops when the base map can't load (offline)", async () => {
+    render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/map"] })} />);
+    await screen.findByText(/Start → End/);
+    const map = FakeMap.instances.at(-1)!;
+
+    act(() => map.emit("error")); // the style URL failed before it ever loaded
+    expect(map.setStyle).toHaveBeenCalledWith(expect.objectContaining({ version: 8, sources: {} }), { diff: false });
+
+    act(() => map.emit("style.load"));
+    expect([...map.layers]).toEqual(["route-casing", "route-line", "stops-circle", "stops-label", "cursor"]);
+
+    act(() => map.emit("error")); // later errors are single tiles: no second fallback
+    expect(map.setStyle).toHaveBeenCalledTimes(1);
   });
 
   it("switches to the dark base map with the theme", async () => {
@@ -179,6 +196,48 @@ describe("MapPage", () => {
 
       expect(screen.getByRole("button", { name: "Show the timeline" })).toHaveAttribute("aria-expanded", "false");
       expect(screen.getByRole("img", { name: /along the route/, hidden: true })).not.toBeVisible();
+    });
+  });
+
+  describe("satellite layer", () => {
+    it("draws land cover under the route, with its legend and credit, until turned off", async () => {
+      const { map } = await openMap();
+      expect(screen.getByRole("radio", { name: "Off" })).toBeChecked();
+
+      fireEvent.click(screen.getByRole("radio", { name: "Land cover" }));
+      expect(await screen.findByText("Tree cover")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Land cover" })).toBeChecked();
+
+      const { spec } = map.getSource("overlay") as { spec: { tiles: string[]; attribution: string } };
+      expect(spec.tiles[0]).toContain("/mosaic/abc123/tiles/WebMercatorQuad/{z}/{x}/{y}?");
+      expect(spec.attribution).toBe('<a href="https://esa-worldcover.org">© ESA WorldCover 2021 / Copernicus Sentinel data</a>');
+      expect(map.before.overlay).toBe("route-casing");
+      // Below the service's first zoom, the same tiles drawn smaller, around the route only.
+      const overview = map.getSource("overlay-overview") as { spec: { tileSize: number; bounds: number[] } };
+      expect(overview.spec.tileSize).toBe(32);
+      expect(overview.spec.bounds).toHaveLength(4);
+
+      fireEvent.click(screen.getByRole("radio", { name: "Off" }));
+      await waitFor(() => expect(map.getLayer("overlay")).toBeUndefined());
+      expect(map.getSource("overlay")).toBeUndefined();
+      expect(map.getSource("overlay-overview")).toBeUndefined();
+      expect(screen.queryByText("Tree cover")).not.toBeInTheDocument();
+    });
+
+    it("colours z0 by roughness class", async () => {
+      await openMap();
+      fireEvent.click(screen.getByRole("radio", { name: "Roughness z0" }));
+
+      expect(await screen.findByText("0.8 m · trees, mangroves, built-up")).toBeInTheDocument();
+    });
+
+    it("says when the tiles can't be reached, and leaves the map as it was", async () => {
+      respondWith(ROUTE_FILE, true, false);
+      const { map } = await openMap();
+      fireEvent.click(screen.getByRole("radio", { name: "Land cover" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load the layer (Land cover tiles: 503).");
+      expect(map.getSource("overlay")).toBeUndefined();
     });
   });
 });
