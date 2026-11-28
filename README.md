@@ -39,7 +39,7 @@ cd frontend && npm run dev                          # web app on http://localhos
 
 **Once the API serves actual data, rebuild the project and run with `VITE_API_MOCK=false`.**
 
-`VITE_REPO_URL` (optional, at build time) points the web app's About and Contact links at a fork.
+`VITE_REPO_URL` (optional, at build time) points the web app's Contact links at a fork.
 
 Test and lint (run before opening a PR):
 
@@ -119,4 +119,3 @@ such as `v0.2.0-rc.1` makes a pre-release. After changing the version, rerun
 | Weather forecasts | Open-Meteo | CC BY 4.0 |
 | Land cover | © ESA WorldCover project / Copernicus Sentinel data | CC BY 4.0 |
 
-The web app's About page shows this README without its commands; keep the two in step.

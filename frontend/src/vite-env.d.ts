@@ -4,7 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   /** "false" to call the real /plan and /forecast; anything else serves the mocks. */
   readonly VITE_API_MOCK?: string;
-  /** The source repository (About and Contact links); defaults to the project's own. */
+  /** The source repository (Contact links); defaults to the project's own. */
   readonly VITE_REPO_URL?: string;
 }
 

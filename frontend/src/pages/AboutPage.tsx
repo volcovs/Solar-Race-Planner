@@ -1,17 +1,8 @@
 import type { ReactNode } from "react";
 import { PageContainer } from "../components/PageContainer";
 import { PageHeader } from "../components/PageHeader";
-import { DATA_SOURCES, REPO_URL } from "../lib/site";
 
-// The README without its commands; keep the two in step.
-const DOCUMENTS: [file: string, what: string][] = [
-  ["architecture.md", "Structure, stack, data flow"],
-  ["data-contracts.md", "File formats between layers"],
-  ["testing.md", "How each part is tested on its own"],
-  ["deployment.md", "Hosting on Northflank"],
-  ["bwsc-facts.md", "The competition"],
-];
-
+// The README's intro and "On a phone"; keep the two in step.
 export function AboutPage() {
   return (
     <PageContainer>
@@ -50,7 +41,6 @@ export function AboutPage() {
             areas you have seen. A banner shows when it's offline and how old the forecast is.
           </p>
         </Card>
-
       </div>
     </PageContainer>
   );
@@ -64,14 +54,3 @@ function Card({ title, children }: { title?: string; children: ReactNode }) {
     </section>
   );
 }
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <li className="flex flex-wrap justify-between gap-x-4 py-2 first:pt-0 last:pb-0">
-      <span className="font-medium text-ink">{label}</span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
-const LINK = "underline-offset-4 hover:underline";

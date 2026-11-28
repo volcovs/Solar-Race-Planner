@@ -8,7 +8,7 @@ export function SiteFooter() {
     <footer className="border-t border-line bg-surface text-sm text-ink-muted">
       <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 py-5 md:flex-row md:items-center md:px-6">
         <p>
-          © {LAST_UPDATE.getFullYear()} {APP_NAME} · {" "}
+          © {LAST_UPDATE.getFullYear()} {APP_NAME} ·{" "}
           <time dateTime={LAST_UPDATE.toISOString()}>{updated.format(LAST_UPDATE)}</time>
         </p>
         <nav aria-label="Site" className="flex flex-wrap gap-x-5 gap-y-1 md:ml-auto">

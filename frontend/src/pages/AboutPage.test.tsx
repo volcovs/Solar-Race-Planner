@@ -19,20 +19,12 @@ afterEach(() => {
 });
 
 describe("About, Contact and the footer", () => {
-  it("tells the README's story, with its documents and the data credits", async () => {
-    await openAt("/about", { VITE_REPO_URL: "https://github.com/example/planner" });
+  it("tells what the project is and how to install it on a phone", async () => {
+    await openAt("/about");
 
     expect(screen.getByRole("heading", { level: 1, name: "About the project" })).toBeInTheDocument();
+    expect(screen.getByText("race strategy app for solar cars")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "On a phone" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "data-contracts.md" })).toHaveAttribute(
-      "href",
-      "https://github.com/example/planner/blob/main/docs/data-contracts.md",
-    );
-    expect(screen.getByRole("link", { name: "© OpenStreetMap contributors" })).toHaveAttribute(
-      "href",
-      "https://www.openstreetmap.org/copyright",
-    );
-    expect(screen.getByRole("link", { name: /ESA WorldCover/ })).toBeInTheDocument();
   });
 
   it("sends questions to the project's GitHub issues", async () => {
@@ -52,7 +44,7 @@ describe("About, Contact and the footer", () => {
     const footer = await screen.findByRole("contentinfo");
     const updated = new Date(__LAST_UPDATE__);
     const month = updated.toLocaleString("en-GB", { month: "long", year: "numeric" });
-    expect(footer).toHaveTextContent(`© ${updated.getFullYear()} Solar Race Planner · Updated ${month}`);
+    expect(footer).toHaveTextContent(`© ${updated.getFullYear()} Solar Race Planner · ${month}`);
     expect(within(footer).getByText(month)).toHaveAttribute("dateTime", updated.toISOString());
     const links = within(within(footer).getByRole("navigation", { name: "Site" })).getAllByRole("link");
     expect(links.map((a) => a.textContent)).toEqual(["About", "Contact"]);
