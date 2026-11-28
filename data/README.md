@@ -7,6 +7,7 @@ in the main README; formats are in `docs/data-contracts.md`.
 ```
 data/
   route/route.parquet          race route (DAT-01)
+  route/segments.parquet       the route in 100 m segments (DAT-02)
   route/raw/overpass.json      cached OpenStreetMap download
   forecasts/                   (later tickets)
   plans/                       (later tickets)

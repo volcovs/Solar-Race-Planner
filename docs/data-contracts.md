@@ -23,6 +23,25 @@ The race route as one line, built from OpenStreetMap by
 `data/route/raw/overpass.json` caches the Overpass response with its query; delete it
 or pass `--refresh` to download again.
 
+## `data/route/segments.parquet` (v1)
+
+The route cut every 100 m from the start line, built from `route.parquet` by
+`python -m solar_race_planner.ingest.segments` (DAT-02). Parquet, one row per segment in
+driving order (~30,000 rows). Distances are geodesic (WGS84), like `length_km`: segments are
+contiguous, and the last `km_end` is the route's `length_km`.
+
+| Column | Type | Unit | Meaning |
+|---|---|---|---|
+| `segment_id` | int32 | | Index from the start line: segment `n` starts at `n × 0.1` km, so the id stays the same between runs |
+| `km_start` | float64 | km | Where the segment starts; equals the previous segment's `km_end` |
+| `km_end` | float64 | km | Where it ends; 0.1 km after `km_start`, except the last segment, which may be shorter |
+| `lat` | float64 | degrees, EPSG:4326 | Midpoint latitude |
+| `lon` | float64 | degrees, EPSG:4326 | Midpoint longitude |
+| `heading_deg` | float64 | degrees, 0–360 | Compass bearing of travel from the segment's start to its end (0 = north, 90 = east); the direction the car drives, which wind angles (MOD-03) use |
+
+The command refuses a route line that doesn't begin at the race start, since its headings would
+point backwards.
+
 
 ## API: `GET /plan` and `GET /forecast` (draft)
 

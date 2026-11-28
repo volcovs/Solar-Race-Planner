@@ -26,7 +26,8 @@ cd frontend && npm ci && cd ..
 Build the data (network required; outputs go to `data/`, which is git-ignored):
 
 ```bash
-python -m solar_race_planner.ingest.route   # race route from OpenStreetMap → data/route/route.parquet
+python -m solar_race_planner.ingest.route      # race route from OpenStreetMap → data/route/route.parquet
+python -m solar_race_planner.ingest.segments   # the route in 100 m segments → data/route/segments.parquet
 ```
 
 Run (two terminals, with the venv active for the API):
