@@ -13,6 +13,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { useEffect, useRef } from "react";
 import { bounds, nearestKm, pointAtKm } from "../../lib/geo";
+import type { MapLayer } from "../../lib/layers";
 import { placeName, type RouteData } from "../../lib/route";
 import { currentTheme, readToken, useTheme, type Theme } from "../../lib/theme";
 
@@ -31,6 +32,9 @@ const LABEL_FONT = ["Noto Sans Regular"]; // available in both base map styles
 const SEGMENTS = "segments";
 const STOPS = "stops";
 const CURSOR = "cursor";
+const OVERLAY = "overlay";
+const OVERVIEW = "overlay-overview";
+const OVERVIEW_ZOOMS = 3; // how far out the overview reaches below the tiles' minzoom
 const ROUTE_LINE = "route-line";
 const TAP_TOLERANCE_PX = 10; // the route line is thin; accept taps near it
 
@@ -40,17 +44,18 @@ interface Props {
   onSelect: (segmentId: number | null) => void;
   cursorKm: number | null; // shared with the timeline: drawn as a dot on the route
   onCursor: (km: number | null) => void;
+  overlay: MapLayer | null; // land cover or z0 tiles under the route
 }
 
 /** MapLibre map of the route and its stops; a stretch of road can be hovered and selected. */
-export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Props) {
+export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor, overlay }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const theme = useTheme();
   const styleLoaded = useRef(false);
   // The style.load handler re-adds layers after every style change and needs the latest props.
-  const latest = useRef({ route, selectedId, onSelect, cursorKm, onCursor });
-  latest.current = { route, selectedId, onSelect, cursorKm, onCursor };
+  const latest = useRef({ route, selectedId, onSelect, cursorKm, onCursor, overlay });
+  latest.current = { route, selectedId, onSelect, cursorKm, onCursor, overlay };
 
   // Create the map once.
   useEffect(() => {
@@ -69,6 +74,7 @@ export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Pr
     map.on("style.load", () => {
       styleLoaded.current = true;
       addRouteLayers(map, latest.current);
+      showOverlay(map, latest.current.overlay, latest.current.route);
     });
     // Offline with no saved copy, the base map can't load: show the route on a plain background.
     // (Errors after it loads are single tiles.)
@@ -138,6 +144,11 @@ export function RouteMap({ route, selectedId, onSelect, cursorKm, onCursor }: Pr
     const middle = segment?.coords[Math.floor(segment.coords.length / 2)];
     if (middle && !map.getBounds().contains(middle)) map.easeTo({ center: middle });
   }, [selectedId, route]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map?.getSource(SEGMENTS)) showOverlay(map, overlay, latest.current.route); // before the style loads, style.load does it
+  }, [overlay]);
 
   useEffect(() => {
     const source = mapRef.current?.getSource<GeoJSONSource>(CURSOR);
@@ -246,6 +257,29 @@ function plainStyle(): StyleSpecification {
     sources: {},
     layers: [{ id: "background", type: "background", paint: { "background-color": readToken("--surface-muted") } }],
   };
+}
+
+/**
+ * Swap the raster layer: under the base map's labels and the route, over its land and water.
+ * The tile service starts at `minzoom`, so further out its first tiles are drawn smaller, and only
+ * around the route: at that scale they are many.
+ */
+function showOverlay(map: MapLibreMap, layer: MapLayer | null, route: RouteData) {
+  for (const id of [OVERLAY, OVERVIEW]) {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+  }
+  if (!layer) return;
+  const credit = Object.assign(document.createElement("a"), { href: layer.attribution_url, textContent: layer.attribution });
+  const { tiles, minzoom } = layer;
+  const [[west, south], [east, north]] = bounds(route.line);
+  const area: [number, number, number, number] = [west - 1, south - 1, east + 1, north + 1];
+  map.addSource(OVERVIEW, { type: "raster", tiles, minzoom, maxzoom: minzoom, bounds: area, tileSize: 256 / 2 ** OVERVIEW_ZOOMS });
+  map.addSource(OVERLAY, { type: "raster", tiles, minzoom, tileSize: 256, attribution: credit.outerHTML });
+  const under = map.getStyle().layers.find((l) => l.type === "symbol")?.id ?? "route-casing";
+  const paint = { "raster-opacity": 0.8 };
+  map.addLayer({ id: OVERVIEW, type: "raster", source: OVERVIEW, maxzoom: minzoom, paint }, under);
+  map.addLayer({ id: OVERLAY, type: "raster", source: OVERLAY, minzoom, paint }, under);
 }
 
 /** The cursor as a point on the route, or nothing. */

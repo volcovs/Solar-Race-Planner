@@ -6,8 +6,9 @@ type Handler = (event?: unknown) => void;
 export class Map {
   static instances: Map[] = [];
   readonly handlers: Record<string, Handler[]> = {};
-  readonly sources = new globalThis.Map<string, { setData: ReturnType<typeof vi.fn> }>();
+  readonly sources = new globalThis.Map<string, { spec: unknown; setData: ReturnType<typeof vi.fn> }>();
   readonly layers = new Set<string>();
+  readonly before: Record<string, string | undefined> = {}; // layer id → the layer it went under
   readonly controls: { onAdd: (map: Map) => HTMLElement }[] = [];
   setStyle = vi.fn();
   fitBounds = vi.fn();
@@ -33,11 +34,21 @@ export class Map {
     if (control.onAdd) this.controls.push(control as { onAdd: (map: Map) => HTMLElement });
     return this;
   }
-  addSource(id: string) {
-    this.sources.set(id, { setData: vi.fn() });
+  addSource(id: string, spec?: unknown) {
+    this.sources.set(id, { spec, setData: vi.fn() });
   }
-  addLayer({ id }: { id: string }) {
+  addLayer({ id }: { id: string }, beforeId?: string) {
     this.layers.add(id);
+    this.before[id] = beforeId;
+  }
+  removeSource(id: string) {
+    this.sources.delete(id);
+  }
+  removeLayer(id: string) {
+    this.layers.delete(id);
+  }
+  getStyle() {
+    return { layers: [...this.layers].map((id) => ({ id, type: "line" })) };
   }
   getSource(id: string) {
     return this.sources.get(id);

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { CursorCard } from "../components/map/CursorCard";
+import { LayerPicker, type LayerLoad } from "../components/map/LayerPicker";
 import { MapPanel } from "../components/map/MapPanel";
 import { RouteMap } from "../components/map/RouteMap";
 import { SegmentCard } from "../components/map/SegmentCard";
 import type { Cursor } from "../components/timeline/RaceTimeline";
 import { TimelinePanel, type TimelineLoad } from "../components/timeline/TimelinePanel";
-import { getForecast, getPlan } from "../lib/api";
+import { getForecast, getLayer, getPlan } from "../lib/api";
+import type { LayerName } from "../lib/layers";
 import { loadRoute, segmentAtKm, type RouteData, type Stop } from "../lib/route";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
@@ -23,6 +25,8 @@ export function MapPage() {
   const [timeline, setTimeline] = useState<TimelineLoad>({ status: "loading" });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [cursor, setCursor] = useState<Cursor>(null);
+  const [layerName, setLayerName] = useState<LayerName | null>(null);
+  const [layer, setLayer] = useState<LayerLoad>({ status: "off" });
 
   useEffect(() => {
     const abort = new AbortController();
@@ -34,6 +38,17 @@ export function MapPage() {
       .catch((error: Error) => abort.signal.aborted || setTimeline({ status: "error", message: error.message }));
     return () => abort.abort();
   }, []);
+
+  // Asked for afresh on each pick: tile URLs can expire.
+  useEffect(() => {
+    if (!layerName) return setLayer({ status: "off" });
+    const abort = new AbortController();
+    setLayer({ status: "loading" });
+    getLayer(layerName, abort.signal)
+      .then((ready) => setLayer({ status: "ready", layer: ready }))
+      .catch((error: Error) => abort.signal.aborted || setLayer({ status: "error", message: error.message }));
+    return () => abort.abort();
+  }, [layerName]);
 
   const route = load.status === "ready" ? load.route : undefined;
   const selected = route && selectedId !== null ? route.segments[selectedId] : undefined;
@@ -52,6 +67,7 @@ export function MapPage() {
             onSelect={setSelectedId}
             cursorKm={cursor?.km ?? null}
             onCursor={fromMap}
+            overlay={layer.status === "ready" ? layer.layer : null}
           />
         )}
 
@@ -62,6 +78,7 @@ export function MapPage() {
               Couldn't load the route ({load.message}).
             </p>
           )}
+          {route && <LayerPicker load={layer} onPick={setLayerName} />}
         </MapPanel>
 
         {route && selected && <SegmentCard segment={selected} stops={route.stops} onClose={() => setSelectedId(null)} />}

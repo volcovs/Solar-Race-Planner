@@ -127,3 +127,20 @@ The body also carries `car`, as for `/replan`.
 discharge_eff}`; fractions as 0–1). The Car page (FE-08) keeps it in the browser only, so the
 server must plan with it and not store it. The page checks the ranges in `frontend/src/lib/car.ts`;
 MOD-01's validation should use the same ones.
+
+## API: `GET /layers/{name}` (draft)
+
+A raster layer the map (FE-11) draws under the route; `name` is `landcover` or `z0`. BE-10 answers:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | As asked |
+| `tiles` | string[] | XYZ templates (`{z}/{x}/{y}`), 256 px; they may expire, so the page asks again on each pick |
+| `minzoom` | number | No tiles below this zoom (WorldCover: 6) |
+| `attribution` | string | The dataset's credit, plain text and short (shown in the map's corner) |
+| `attribution_url` | string | Where the credit links to |
+| `legend` | `{label, color}[]` | Colours as `#rrggbb`, in the order shown |
+
+Until BE-10 exists, the mock asks Microsoft Planetary Computer for ESA WorldCover 2021 (10 m,
+CC BY 4.0) tiles in the browser, and colours z0 by land-cover class with provisional values
+(DAT-05 owns the table).

@@ -1,4 +1,5 @@
 import { currentCar } from "./car";
+import type { LayerName, MapLayer } from "./layers";
 import type { ForecastResponse, PlanResponse, ReplanRequest, Scenario } from "./plan";
 
 // Deployed builds set VITE_API_URL to the API URL; in dev, /api is proxied to localhost:8000.
@@ -56,4 +57,10 @@ export async function runScenarios(scenarios: Scenario[], signal?: AbortSignal):
   });
   if (!res.ok) throw new Error(`/scenarios: ${res.status}`);
   return ((await res.json()) as { plans: PlanResponse[] }).plans;
+}
+
+/** A map layer's tiles, legend and credit. */
+export async function getLayer(name: LayerName, signal?: AbortSignal): Promise<MapLayer> {
+  if (MOCK_API) return (await import("../mocks/layers")).mockLayer(name, signal);
+  return getJson<MapLayer>(`/layers/${name}`, signal);
 }
